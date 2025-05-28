@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员控制台 - yt-dlp</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #e1e8ed;
+        }
+
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #27ae60, #2ecc71);
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 25px;
+        }
+
+        .tab {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #7f8c8d;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #27ae60;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #f39c12;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .scenario-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .scenario-card h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .scenario-card p {
+            color: #555;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .scenario-card .scenario-settings {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>🛠️ 管理员控制台</h1>
+            <div class="user-info">
+                <span>欢迎，<span id="username">管理员</span></span>
+                <button class="logout-btn" onclick="logout()">登出</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="message-area"></div>
+
+        <!-- 仪表板概览 -->
+        <div class="dashboard-grid">
+            <!-- 存储信息卡片 -->
+            <div class="card">
+                <h3>💾 存储状态</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div id="total-files" class="stat-value">-</div>
+                        <div class="stat-label">文件总数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="total-size" class="stat-value">-</div>
+                        <div class="stat-label">已用空间</div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div id="storage-progress" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <span id="storage-usage">0%</span> / <span id="max-storage">2048 MB</span>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-warning" onclick="manualCleanup()">
+                        <span id="cleanup-text">立即清理</span>
+                        <span id="cleanup-loading" class="loading hidden"></span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="refreshStorage()">刷新</button>
+                </div>
+            </div>
+
+            <!-- 系统信息卡片 -->
+            <div class="card">
+                <h3>📊 系统信息</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div id="current-version" class="stat-value">-</div>
+                        <div class="stat-label">当前版本</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="last-update" class="stat-value">-</div>
+                        <div class="stat-label">最后更新</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="checkUpdate()">
+                        <span id="update-check-text">检查更新</span>
+                        <span id="update-check-loading" class="loading hidden"></span>
+                    </button>
+                    <button class="btn btn-success" onclick="startUpdate()" id="update-btn" style="display: none;">开始更新</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配置标签页 -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" data-tab="cleanup">清理配置</button>
+                <button class="tab" data-tab="scenarios">使用场景</button>
+                <button class="tab" data-tab="advanced">高级设置</button>
+            </div>
+
+            <!-- 清理配置标签页 -->
+            <div id="cleanup-tab" class="tab-content active">
+                <form id="cleanup-config-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="auto-cleanup">启用自动清理：</label>
+                            <select id="auto-cleanup" name="auto_cleanup_enabled">
+                                <option value="true">启用</option>
+                                <option value="false">禁用</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cleanup-interval">清理检查间隔（小时）：</label>
+                            <input type="number" id="cleanup-interval" name="cleanup_interval_hours" min="0.5" max="24" step="0.5" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="file-retention">文件保留时间（小时）：</label>
+                            <input type="number" id="file-retention" name="file_retention_hours" min="1" max="168" value="24">
+                        </div>
+                        <div class="form-group">
+                            <label for="max-storage">最大存储空间（MB）：</label>
+                            <input type="number" id="max-storage-input" name="max_storage_mb" min="100" max="10240" value="2048">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="keep-recent">保留最近文件数：</label>
+                            <input type="number" id="keep-recent" name="keep_recent_files" min="1" max="100" value="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="temp-retention">临时文件保留（分钟）：</label>
+                            <input type="number" id="temp-retention" name="temp_file_retention_minutes" min="5" max="120" value="30">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="cleanup-on-download" name="cleanup_on_download" checked>
+                            下载完成后立即检查清理
+                        </label>
+                    </div>
+
+                    <div style="margin-top: 25px;">
+                        <button type="submit" class="btn btn-primary">
+                            <span id="save-config-text">保存配置</span>
+                            <span id="save-config-loading" class="loading hidden"></span>
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 使用场景标签页 -->
+            <div id="scenarios-tab" class="tab-content">
+                <div class="scenario-card">
+                    <h4>📱 场景1：正常使用</h4>
+                    <p>• 用户下载视频 → 文件保存24小时 → 自动删除</p>
+                    <p>• 临时文件30分钟后自动清理</p>
+                    <p>• 始终保留最近20个文件</p>
+                    <div class="scenario-settings">
+                        <button class="btn btn-primary" onclick="applyScenario('normal')">应用此场景</button>
+                        <small style="color: #7f8c8d;">文件保留: 24小时 | 存储限制: 2GB | 保留文件: 20个</small>
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <h4>💾 场景2：存储空间不足</h4>
+                    <p>• 检测到存储超过2GB → 立即清理最旧文件</p>
+                    <p>• 保留最近文件，确保用户体验</p>
+                    <p>• 更频繁的清理检查</p>
+                    <div class="scenario-settings">
+                        <button class="btn btn-warning" onclick="applyScenario('limited')">应用此场景</button>
+                        <small style="color: #7f8c8d;">文件保留: 12小时 | 存储限制: 1GB | 保留文件: 10个</small>
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <h4>🚀 场景3：大量下载</h4>
+                    <p>• 每次下载完成后检查存储</p>
+                    <p>• 如果接近限制，提前清理</p>
+                    <p>• 适合高频使用的服务器</p>
+                    <div class="scenario-settings">
+                        <button class="btn btn-success" onclick="applyScenario('heavy')">应用此场景</button>
+                        <small style="color: #7f8c8d;">文件保留: 6小时 | 存储限制: 4GB | 保留文件: 30个</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 高级设置标签页 -->
+            <div id="advanced-tab" class="tab-content">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="admin-username">管理员用户名：</label>
+                        <input type="text" id="admin-username" value="admin" readonly>
+                        <small style="color: #7f8c8d;">通过环境变量 ADMIN_USERNAME 修改</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="session-timeout">会话超时（小时）：</label>
+                        <input type="number" id="session-timeout" min="1" max="72" value="24">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="download-folder">下载文件夹：</label>
+                    <input type="text" id="download-folder" readonly>
+                    <small style="color: #7f8c8d;">通过环境变量 DOWNLOAD_FOLDER 修改</small>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="btn btn-danger" onclick="clearAllFiles()">清空所有下载文件</button>
+                    <button class="btn btn-warning" onclick="restartService()">重启服务</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let authToken = localStorage.getItem('auth_token') || '';
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            initializeTabs();
+            loadConfig();
+            loadStorageInfo();
+            loadVersionInfo();
+        });
+
+        // 检查认证状态
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.valid) {
+                        document.getElementById('username').textContent = data.username;
+                        return;
+                    }
+                }
+
+                // 认证失败，跳转到登录页
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+            } catch (error) {
+                console.error('认证检查失败:', error);
+                window.location.href = '/login';
+            }
+        }
+
+        // 初始化标签页
+        function initializeTabs() {
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTab = tab.dataset.tab;
+
+                    // 移除所有活动状态
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(tc => tc.classList.remove('active'));
+
+                    // 激活当前标签
+                    tab.classList.add('active');
+                    document.getElementById(targetTab + '-tab').classList.add('active');
+                });
+            });
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'success') {
+            const messageArea = document.getElementById('message-area');
+            const className = type === 'error' ? 'message error' :
+                             type === 'warning' ? 'message warning' : 'message success';
+
+            messageArea.innerHTML = `<div class="${className}" style="display: block;">${message}</div>`;
+
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+
+        // 设置加载状态
+        function setLoading(textId, loadingId, isLoading) {
+            const textElement = document.getElementById(textId);
+            const loadingElement = document.getElementById(loadingId);
+
+            if (isLoading) {
+                textElement.classList.add('hidden');
+                loadingElement.classList.remove('hidden');
+            } else {
+                textElement.classList.remove('hidden');
+                loadingElement.classList.add('hidden');
+            }
+        }
+
+        // 加载存储信息
+        async function loadStorageInfo() {
+            try {
+                const response = await fetch('/api/admin/storage-info', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStorageDisplay(data);
+                } else {
+                    console.error('获取存储信息失败');
+                }
+            } catch (error) {
+                console.error('加载存储信息失败:', error);
+            }
+        }
+
+        // 更新存储显示
+        function updateStorageDisplay(data) {
+            document.getElementById('total-files').textContent = data.total_files;
+            document.getElementById('total-size').textContent = data.total_size_mb + ' MB';
+            document.getElementById('storage-usage').textContent = data.usage_percent + '%';
+            document.getElementById('max-storage').textContent = data.max_storage_mb + ' MB';
+
+            const progressBar = document.getElementById('storage-progress');
+            progressBar.style.width = data.usage_percent + '%';
+
+            // 根据使用率设置颜色
+            progressBar.className = 'progress-fill';
+            if (data.usage_percent > 80) {
+                progressBar.classList.add('danger');
+            } else if (data.usage_percent > 60) {
+                progressBar.classList.add('warning');
+            }
+        }
+
+        // 刷新存储信息
+        function refreshStorage() {
+            loadStorageInfo();
+            showMessage('存储信息已刷新');
+        }
+
+        // 手动清理
+        async function manualCleanup() {
+            setLoading('cleanup-text', 'cleanup-loading', true);
+
+            try {
+                const response = await fetch('/api/admin/cleanup', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(`清理完成！删除了 ${data.cleaned_files} 个文件`);
+                    updateStorageDisplay(data.storage_info);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || '清理失败', 'error');
+                }
+            } catch (error) {
+                showMessage('清理过程中出现错误', 'error');
+            } finally {
+                setLoading('cleanup-text', 'cleanup-loading', false);
+            }
+        }
+
+        // 加载版本信息
+        async function loadVersionInfo() {
+            try {
+                const response = await fetch('/api/admin/version', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('current-version').textContent = data.current_version;
+                    document.getElementById('last-update').textContent = data.last_update;
+                }
+            } catch (error) {
+                console.error('加载版本信息失败:', error);
+            }
+        }
+
+        // 检查更新
+        async function checkUpdate() {
+            setLoading('update-check-text', 'update-check-loading', true);
+
+            try {
+                const response = await fetch('/api/admin/update-check', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.update_available) {
+                        showMessage('发现新版本可用！', 'warning');
+                        document.getElementById('update-btn').style.display = 'inline-block';
+                    } else {
+                        showMessage('已是最新版本');
+                        document.getElementById('update-btn').style.display = 'none';
+                    }
+                } else {
+                    showMessage('检查更新失败', 'error');
+                }
+            } catch (error) {
+                showMessage('检查更新时出现错误', 'error');
+            } finally {
+                setLoading('update-check-text', 'update-check-loading', false);
+            }
+        }
+
+        // 开始更新
+        async function startUpdate() {
+            if (!confirm('确定要开始更新吗？更新过程中服务可能会短暂中断。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/update', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    showMessage('更新已开始，请稍后刷新页面查看结果', 'warning');
+                    document.getElementById('update-btn').style.display = 'none';
+                } else {
+                    showMessage('启动更新失败', 'error');
+                }
+            } catch (error) {
+                showMessage('更新过程中出现错误', 'error');
+            }
+        }
+
+        // 登出
+        async function logout() {
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            }
+
+            localStorage.removeItem('auth_token');
+            window.location.href = '/login';
+        }
+
+        // 加载清理配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/admin/cleanup-config', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const config = await response.json();
+                    populateConfigForm(config);
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+
+        // 填充配置表单
+        function populateConfigForm(config) {
+            document.getElementById('auto-cleanup').value = config.auto_cleanup_enabled.toString();
+            document.getElementById('cleanup-interval').value = config.cleanup_interval_hours;
+            document.getElementById('file-retention').value = config.file_retention_hours;
+            document.getElementById('max-storage-input').value = config.max_storage_mb;
+            document.getElementById('keep-recent').value = config.keep_recent_files;
+            document.getElementById('temp-retention').value = config.temp_file_retention_minutes;
+            document.getElementById('cleanup-on-download').checked = config.cleanup_on_download;
+        }
+
+        // 保存配置
+        document.getElementById('cleanup-config-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            setLoading('save-config-text', 'save-config-loading', true);
+
+            const formData = new FormData(this);
+            const config = {};
+
+            for (let [key, value] of formData.entries()) {
+                if (key === 'auto_cleanup_enabled' || key === 'cleanup_on_download') {
+                    config[key] = value === 'true' || value === 'on';
+                } else {
+                    config[key] = parseFloat(value) || value;
+                }
+            }
+
+            try {
+                const response = await fetch('/api/admin/cleanup-config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    showMessage('配置保存成功！');
+                    loadStorageInfo(); // 刷新存储信息
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || '保存配置失败', 'error');
+                }
+            } catch (error) {
+                showMessage('保存配置时出现错误', 'error');
+            } finally {
+                setLoading('save-config-text', 'save-config-loading', false);
+            }
+        });
+
+        // 应用预设场景
+        function applyScenario(scenario) {
+            const scenarios = {
+                'normal': {
+                    auto_cleanup_enabled: true,
+                    cleanup_interval_hours: 1,
+                    file_retention_hours: 24,
+                    max_storage_mb: 2048,
+                    keep_recent_files: 20,
+                    temp_file_retention_minutes: 30,
+                    cleanup_on_download: true
+                },
+                'limited': {
+                    auto_cleanup_enabled: true,
+                    cleanup_interval_hours: 0.5,
+                    file_retention_hours: 12,
+                    max_storage_mb: 1024,
+                    keep_recent_files: 10,
+                    temp_file_retention_minutes: 15,
+                    cleanup_on_download: true
+                },
+                'heavy': {
+                    auto_cleanup_enabled: true,
+                    cleanup_interval_hours: 0.25,
+                    file_retention_hours: 6,
+                    max_storage_mb: 4096,
+                    keep_recent_files: 30,
+                    temp_file_retention_minutes: 10,
+                    cleanup_on_download: true
+                }
+            };
+
+            const config = scenarios[scenario];
+            if (config) {
+                populateConfigForm(config);
+                showMessage(`已应用${scenario === 'normal' ? '正常使用' : scenario === 'limited' ? '存储受限' : '大量下载'}场景配置`);
+            }
+        }
+
+        // 清空所有文件
+        async function clearAllFiles() {
+            if (!confirm('确定要清空所有下载文件吗？此操作不可恢复！')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/cleanup', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    showMessage('所有文件已清空');
+                    loadStorageInfo();
+                } else {
+                    showMessage('清空文件失败', 'error');
+                }
+            } catch (error) {
+                showMessage('清空文件时出现错误', 'error');
+            }
+        }
+
+        // 重启服务（仅显示提示）
+        function restartService() {
+            showMessage('请手动重启服务器以应用某些配置更改', 'warning');
+        }
+    </script>
+</body>
+</html>

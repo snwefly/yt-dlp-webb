@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  yt-dlp-web:
+    image: ghcr.io/your-username/yt-dlp-web-deploy:latest
+    container_name: yt-dlp-web-prod
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # 使用命名卷以提高性能和安全性
+      - downloads:/app/downloads
+      - config:/app/config
+      - logs:/app/logs
+    environment:
+      # 管理员账号配置（生产环境请修改）
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me-in-production}
+      # 下载文件夹配置
+      - DOWNLOAD_FOLDER=/app/downloads
+      # Flask密钥（生产环境必须修改）
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
+      # 时区设置
+      - TZ=${TZ:-Asia/Shanghai}
+      # 安全配置
+      - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS:-3}
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-5368709120}
+      # 日志级别
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Python配置
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - yt-dlp-network
+    labels:
+      # Traefik标签（如果使用Traefik）
+      - "traefik.enable=true"
+      - "traefik.http.routers.yt-dlp.rule=Host(`yt-dlp.yourdomain.com`)"
+      - "traefik.http.routers.yt-dlp.tls=true"
+      - "traefik.http.routers.yt-dlp.tls.certresolver=letsencrypt"
+      - "traefik.http.services.yt-dlp.loadbalancer.server.port=8080"
+      # 安全头
+      - "traefik.http.middlewares.yt-dlp-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.middlewares.yt-dlp-headers.headers.customresponseheaders.X-Frame-Options=DENY"
+      - "traefik.http.middlewares.yt-dlp-headers.headers.customresponseheaders.X-Content-Type-Options=nosniff"
+      - "traefik.http.middlewares.yt-dlp-headers.headers.customresponseheaders.X-XSS-Protection=1; mode=block"
+      - "traefik.http.routers.yt-dlp.middlewares=yt-dlp-headers"
+      # 应用信息
+      - "app.name=yt-dlp-web"
+      - "app.description=YouTube下载器Web界面"
+      - "app.version=1.0.0"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # 可选：添加反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: yt-dlp-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - yt-dlp-web
+    networks:
+      - yt-dlp-network
+
+  # 可选：添加监控
+  watchtower:
+    image: containrrr/watchtower
+    container_name: yt-dlp-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=3600
+      - WATCHTOWER_INCLUDE_STOPPED=true
+    command: yt-dlp-web
+
+networks:
+  yt-dlp-network:
+    driver: bridge
+
+volumes:
+  downloads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./downloads
+  config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./config
+  logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs
