@@ -29,7 +29,7 @@ ENV PYTHONPATH=/app
 # 创建非root用户（提前创建以提高安全性）
 RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
 
-# 安装系统依赖
+# 安装系统依赖和构建工具
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
@@ -37,6 +37,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     dos2unix \
+    gcc \
+    g++ \
+    make \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    python3-dev \
+    pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
