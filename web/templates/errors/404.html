@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误 - 未找到页面</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/error_pages.css') }}">
+</head>
+<body>
+    <div class="error-container">
+        <h1>:( 404 - 未找到页面</h1>
+        <p>抱歉，您要查找的页面不存在。它可能已被移动、删除或从未存在过。</p>
+        <p><a href="{{ url_for('index') }}">返回主页</a></p>
+    </div>
+</body>
+</html>

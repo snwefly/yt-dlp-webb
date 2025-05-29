@@ -27,8 +27,6 @@ RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
-    wget \
-    git \
     ca-certificates \
     dos2unix \
     && apt-get clean \

@@ -73,13 +73,11 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 
 # 复制应用代码
-COPY yt_dlp/web /app/yt_dlp/web
+COPY web /app/web  # Corrected path
 COPY start.sh /app/
 
-# 创建yt_dlp包的__init__.py
-RUN mkdir -p /app/yt_dlp && echo "# yt-dlp web interface" > /app/yt_dlp/__init__.py
-
 # 创建必要目录并设置权限
+# Removed problematic yt_dlp directory creation here
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
     && chmod +x /app/start.sh \
