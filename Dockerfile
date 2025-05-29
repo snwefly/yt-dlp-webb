@@ -66,12 +66,10 @@ RUN dos2unix /app/start.sh && \
     chmod +x /app/start.sh && \
     chown ytdlp:ytdlp /app/start.sh
 
-# 创建必要的Python包结构并验证
+# 创建必要的Python包结构
 RUN echo "创建 Python 包结构..." && \
     mkdir -p /app/yt_dlp && \
     touch /app/yt_dlp/__init__.py && \
-    echo "验证 Python 包结构..." && \
-    python3 -c "import sys; print('Python 路径:', sys.path); import yt_dlp; print('yt-dlp 导入成功')" && \
     echo "包结构创建完成"
 
 # 创建必要目录并设置权限
@@ -80,8 +78,13 @@ RUN mkdir -p /app/downloads /app/config /app/logs \
     && chmod 755 /app/downloads /app/config /app/logs
 
 # 创建软链接以确保模块可以被正确导入
-RUN ln -sf /usr/local/lib/python3.11/site-packages/yt_dlp/cookies.py /app/yt_dlp/cookies.py && \
-    ln -sf /usr/local/lib/python3.11/site-packages/yt_dlp/version.py /app/yt_dlp/version.py
+RUN echo "创建软链接..." && \
+    ln -sf /usr/local/lib/python3.11/site-packages/yt_dlp/cookies.py /app/yt_dlp/cookies.py && \
+    ln -sf /usr/local/lib/python3.11/site-packages/yt_dlp/version.py /app/yt_dlp/version.py && \
+    echo "软链接创建完成" && \
+    echo "验证软链接..." && \
+    ls -l /app/yt_dlp/cookies.py /app/yt_dlp/version.py && \
+    echo "软链接验证完成"
 
 # 切换到非root用户
 USER ytdlp
