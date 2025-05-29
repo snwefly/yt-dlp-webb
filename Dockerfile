@@ -1,5 +1,5 @@
-# 使用官方Python 3.11镜像作为基础镜像
-FROM python:3.11-slim
+# 使用Alpine版本的Python 3.11镜像作为基础镜像
+FROM python:3.11-alpine
 
 # 构建参数
 ARG BUILDTIME
@@ -23,23 +23,25 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV VERSION=${VERSION}
 ENV REVISION=${REVISION}
-ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONPATH=/app
 
-# 创建非root用户（提前创建以提高安全性）
-RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
+# 创建非root用户
+RUN addgroup -S ytdlp && adduser -S ytdlp -G ytdlp
 
 # 安装系统依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
     ffmpeg \
     curl \
     wget \
     git \
     ca-certificates \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /tmp/* \
-    && rm -rf /var/tmp/*
+    gcc \
+    musl-dev \
+    python3-dev \
+    libffi-dev \
+    openssl-dev \
+    rust \
+    cargo
 
 # 升级pip并安装Python依赖
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
@@ -57,14 +59,16 @@ COPY start.sh /app/
 
 # 创建必要的Python包结构
 RUN mkdir -p /app/yt_dlp && \
-    touch /app/yt_dlp/__init__.py && \
-    python3 -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
+    touch /app/yt_dlp/__init__.py
 
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
     && chmod +x /app/start.sh \
     && chmod 755 /app/downloads /app/config /app/logs
+
+# 清理构建依赖
+RUN apk del gcc musl-dev python3-dev libffi-dev openssl-dev rust cargo
 
 # 切换到非root用户
 USER ytdlp
