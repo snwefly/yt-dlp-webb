@@ -29,22 +29,12 @@ ENV PYTHONPATH=/app
 # 创建非root用户（提前创建以提高安全性）
 RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
 
-# 安装系统依赖和构建工具
+# 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     curl \
     wget \
-    git \
     ca-certificates \
     dos2unix \
-    gcc \
-    g++ \
-    make \
-    build-essential \
-    libffi-dev \
-    libssl-dev \
-    python3-dev \
-    pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
@@ -58,14 +48,14 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
-COPY web /app/web
+COPY webapp /app/webapp
 COPY yt_dlp /app/yt_dlp
 COPY start.sh /app/
 
 # 验证项目结构
 RUN echo "验证项目结构..." && \
     ls -la /app/ && \
-    ls -la /app/web/ && \
+    ls -la /app/webapp/ && \
     ls -la /app/yt_dlp/ && \
     echo "项目结构验证完成"
 

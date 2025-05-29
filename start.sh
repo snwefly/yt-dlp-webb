@@ -28,4 +28,12 @@ fi
 # 启动Web应用
 echo "🌐 启动Web服务器..."
 cd /app
-python3 -m web.server --host 0.0.0.0 --port 8080
+
+# 使用 gunicorn 启动（生产环境）
+if command -v gunicorn &> /dev/null; then
+    echo "使用 Gunicorn 启动..."
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 webapp.app:app
+else
+    echo "使用 Flask 开发服务器启动..."
+    python3 -m webapp.server --host 0.0.0.0 --port 8080 --no-browser
+fi

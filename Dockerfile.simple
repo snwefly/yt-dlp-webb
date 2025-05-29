@@ -1,0 +1,66 @@
+# 简化版 Dockerfile - 如果主版本构建失败则使用此版本
+FROM python:3.11-slim
+
+# 构建参数
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+
+# 添加标签
+LABEL org.opencontainers.image.title="YT-DLP 网页界面"
+LABEL org.opencontainers.image.description="带下载管理的yt-dlp网页界面"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL org.opencontainers.image.revision="${REVISION}"
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/app
+
+# 创建非root用户
+RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
+
+# 安装基础系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 升级pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# 安装最小依赖
+RUN pip install --no-cache-dir \
+    Flask==2.3.3 \
+    flask-cors==4.0.0 \
+    Werkzeug==2.3.7 \
+    requests==2.31.0 \
+    gunicorn==21.2.0
+
+# 复制项目文件
+COPY web /app/web
+COPY yt_dlp /app/yt_dlp
+COPY start.sh /app/
+
+# 设置权限
+RUN chmod +x /app/start.sh && \
+    mkdir -p /app/downloads /app/config /app/logs && \
+    chown -R ytdlp:ytdlp /app
+
+# 切换到非root用户
+USER ytdlp
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/ || exit 1
+
+# 启动命令
+CMD ["/app/start.sh"]
