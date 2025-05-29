@@ -13,15 +13,15 @@ services:
       # 配置文件持久化
       - yt-dlp-config:/app/config
     environment:
-      # 管理员账号配置（请修改默认密码）
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin123
+      # 管理员账号配置（请在Portainer UI中或通过 .env 文件设置）
+      # - ADMIN_USERNAME=admin
+      # - ADMIN_PASSWORD=admin123
       # 下载文件夹配置
       - DOWNLOAD_FOLDER=/app/downloads
-      # Flask密钥（生产环境请修改）
-      - SECRET_KEY=your-secret-key-change-in-production-environment
+      # Flask密钥（请在Portainer UI中或通过 .env 文件设置）
+      # - SECRET_KEY=your-secret-key-change-in-production-environment
       # 时区设置
-      - TZ=Asia/Shanghai
+      - TZ=Asia/Shanghai # Default TZ is acceptable
       # 清理配置
       - AUTO_CLEANUP_ENABLED=true
       - FILE_RETENTION_HOURS=24

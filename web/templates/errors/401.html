@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误 - 未授权</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/error_pages.css') }}">
+</head>
+<body>
+    <div class="error-container">
+        <h1>:( 401 - 未授权</h1>
+        <p>您需要有效的凭据才能访问此页面或资源。请先登录。</p>
+        <p><a href="{{ url_for('login') }}">前往登录页面</a></p>
+        <p><a href="{{ url_for('index') }}">返回主页</a></p>
+    </div>
+</body>
+</html>

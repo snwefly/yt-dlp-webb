@@ -26,15 +26,40 @@ class AuthManager:
         # 存储活跃会话
         self.active_sessions = {}
     
-    def _hash_password(self, password):
-        """密码哈希"""
-        return hashlib.sha256(password.encode()).hexdigest()
-    
+    def _hash_password(self, password, salt=None):
+        """密码哈希 - 使用 PBKDF2-HMAC-SHA256"""
+        # 在真实应用中，salt 应该是随机生成并与哈希一起存储的
+        # 为了简化环境变量配置，这里使用固定 salt 或从环境变量读取
+        # 强烈建议为每个密码使用唯一的随机 salt
+        iterations = 260000  # NIST 推荐的最小迭代次数
+        dklen = 64  # 期望的派生密钥长度（字节）
+        
+        # 如果没有提供 salt，则使用环境变量或固定值
+        # 注意：为所有密码使用相同的 salt 会降低安全性。
+        # 更好的做法是生成一个随机 salt，并将其与哈希一起存储。
+        # 例如：salt = secrets.token_bytes(16)
+        # 然后存储 salt.hex() + ':' + hashed_password.hex()
+        
+        # 为了此示例，我们将使用一个固定的 salt 或从环境变量获取
+        # 这仍然比单次 SHA256 强得多
+        _salt_str = os.environ.get('PASSWORD_SALT', "a_default_fixed_salt_for_this_app")
+        _salt = _salt_str.encode('utf-8')
+
+        hashed_password = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            _salt,
+            iterations,
+            dklen=dklen
+        )
+        return hashed_password.hex() # 返回十六进制编码的哈希
+
     def verify_credentials(self, username, password):
         """验证用户凭据"""
         if username == self.admin_username:
-            password_hash = self._hash_password(password)
-            return password_hash == self.admin_password_hash
+            # 假设 self.admin_password_hash 是使用上述 _hash_password 方法生成的
+            password_hash_to_check = self._hash_password(password)
+            return password_hash_to_check == self.admin_password_hash
         return False
     
     def create_session(self, username):
@@ -56,9 +81,11 @@ class AuthManager:
         
         session_data = self.active_sessions[session_token]
         
-        # 检查会话是否过期
-        if datetime.now() - session_data['created_at'] > timedelta(hours=self.session_timeout_hours):
-            del self.active_sessions[session_token]
+        # 检查会话是否过期 (基于最后活动时间)
+        if datetime.now() - session_data.get('last_activity', session_data['created_at']) > \
+           timedelta(hours=self.session_timeout_hours):
+            if session_token in self.active_sessions: # 再次检查以防并发删除
+                 del self.active_sessions[session_token]
             return False
         
         # 更新最后活动时间
@@ -81,12 +108,14 @@ class AuthManager:
         current_time = datetime.now()
         expired_tokens = []
         
-        for token, session_data in self.active_sessions.items():
-            if current_time - session_data['created_at'] > timedelta(hours=self.session_timeout_hours):
+        for token, data in list(self.active_sessions.items()): # 使用 list() 避免在迭代时修改字典
+            if current_time - data.get('last_activity', data['created_at']) > \
+               timedelta(hours=self.session_timeout_hours):
                 expired_tokens.append(token)
         
         for token in expired_tokens:
-            del self.active_sessions[token]
+            if token in self.active_sessions: # 再次检查以防并发删除
+                 del self.active_sessions[token]
         
         return len(expired_tokens)
 
