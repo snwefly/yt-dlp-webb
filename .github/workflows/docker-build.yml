@@ -69,7 +69,7 @@ jobs:
       id: build_info
       run: |
         echo "buildtime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-        echo "version=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}" >> $GITHUB_OUTPUT
+        echo "version=${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT  # <-- 修改在此
         echo "revision=${{ github.sha }}" >> $GITHUB_OUTPUT
 
     - name: 构建并推送Docker镜像
