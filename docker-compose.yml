@@ -13,13 +13,13 @@ services:
       # 配置文件持久化（可选）
       - ./config:/app/config
     environment:
-      # 管理员账号配置 (请在 .env 文件中配置或作为环境变量传入)
-      # - ADMIN_USERNAME=admin 
-      # - ADMIN_PASSWORD=admin123
+      # 管理员账号配置
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
       # 下载文件夹配置
       - DOWNLOAD_FOLDER=/app/downloads
-      # Flask密钥（生产环境请在 .env 文件中配置或作为环境变量传入）
-      # - SECRET_KEY=your-secret-key-change-in-production
+      # Flask密钥（生产环境请修改）
+      - SECRET_KEY=your-secret-key-change-in-production
       # 时区设置
       - TZ=Asia/Shanghai
     networks:
@@ -38,8 +38,8 @@ networks:
   yt-dlp-network:
     driver: bridge
 
-# volumes: # Host-path mounts are used in the service definition above.
-#   downloads:
-#     driver: local
-#   config:
-#     driver: local
+volumes:
+  downloads:
+    driver: local
+  config:
+    driver: local

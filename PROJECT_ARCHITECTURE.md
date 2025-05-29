@@ -49,33 +49,33 @@ export SECRET_KEY=${SECRET_KEY:-dev-key}
 export DOWNLOAD_FOLDER=${DOWNLOAD_FOLDER:-/app/downloads}
 
 # 启动 Web 服务器
-python3 -m yt_dlp.web.server --host 0.0.0.0 --port 8080
+python3 -m web.server --host 0.0.0.0 --port 8080
 ```
 
 ### 2. Flask 应用创建
 ```python
-# yt_dlp/web/app.py - create_app()
+# web/app.py - create_app()
 def create_app(config=None):
     app = Flask(__name__)
-    
+
     # 配置应用
     app.config.update({
         'SECRET_KEY': os.environ.get('SECRET_KEY', 'dev-key'),
         'DOWNLOAD_FOLDER': config.get('DOWNLOAD_FOLDER', './downloads'),
         'DEBUG': config.get('DEBUG', False)
     })
-    
+
     # 初始化组件
     CORS(app)  # 跨域支持
     initialize_cleanup_manager()  # 文件清理
     register_routes(app)  # 注册路由
-    
+
     return app
 ```
 
 ### 3. 服务器启动
 ```python
-# yt_dlp/web/server.py - WebServer.start()
+# web/server.py - WebServer.start()
 def start(self, open_browser=True):
     self.app.run(
         host=self.host,      # 0.0.0.0
@@ -89,7 +89,7 @@ def start(self, open_browser=True):
 
 ### 1. 认证管理器初始化
 ```python
-# yt_dlp/web/auth.py - AuthManager
+# web/auth.py - AuthManager
 class AuthManager:
     def __init__(self):
         # 从环境变量读取管理员账号
@@ -126,13 +126,13 @@ class DownloadManager:
     def __init__(self):
         self.downloads = {}      # 存储所有下载任务
         self.lock = threading.Lock()  # 线程安全锁
-    
+
     def add_download(self, download_id, url, options):
         # 添加新下载任务
-        
+
     def update_download(self, download_id, **kwargs):
         # 更新下载状态
-        
+
     def get_download(self, download_id):
         # 获取下载信息
 ```
@@ -151,23 +151,23 @@ def _download_worker(download_id, url, ydl_opts):
     try:
         # 更新状态为下载中
         download_manager.update_download(download_id, status='downloading')
-        
+
         # 配置进度回调
         ydl_opts['progress_hooks'] = [
             lambda d: _progress_hook(download_id, d)
         ]
-        
+
         # 执行下载
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-            
+
         # 更新状态为完成
         download_manager.update_download(download_id, status='completed')
-        
+
     except Exception as e:
         # 更新状态为错误
-        download_manager.update_download(download_id, 
-                                       status='error', 
+        download_manager.update_download(download_id,
+                                       status='error',
                                        error=str(e))
 ```
 
@@ -243,19 +243,19 @@ def validate_url(url):
 const App = {
     // URL 验证
     validateUrl(url) { /* ... */ },
-    
+
     // 获取视频信息
     async getVideoInfo(url) { /* ... */ },
-    
+
     // 开始下载
     async startDownload(options) { /* ... */ },
-    
+
     // 轮询状态更新
     pollDownloadStatus() { /* ... */ },
-    
+
     // 文件管理
     loadFiles() { /* ... */ },
-    
+
     // iOS 快捷指令
     setupShortcuts() { /* ... */ }
 };
@@ -319,10 +319,10 @@ class FileCleanupManager:
             'max_storage_mb': 2048,          # 最大2GB
             'keep_recent_files': 20,         # 保留最近20个
         }
-    
+
     def cleanup_files(self):
         # 1. 清理过期文件
-        # 2. 清理临时文件  
+        # 2. 清理临时文件
         # 3. 检查存储限制
         # 4. 清理空目录
 ```
@@ -344,7 +344,7 @@ class FileCleanupManager:
 FROM python:3.11-slim as builder
 # 安装构建依赖和Python包
 
-FROM python:3.11-slim as runtime  
+FROM python:3.11-slim as runtime
 # 复制运行时文件
 # 创建非root用户
 # 设置权限和环境

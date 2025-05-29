@@ -5,23 +5,23 @@ services:
     image: ghcr.io/your-username/yt-dlp-web-deploy:latest
     container_name: yt-dlp-web-prod
     restart: unless-stopped
-    expose: # Changed from ports to expose, assuming reverse proxy on same Docker network
-      - "8080"
+    ports:
+      - "8080:8080"
     volumes:
       # 使用命名卷以提高性能和安全性
       - downloads:/app/downloads
       - config:/app/config
       - logs:/app/logs
     environment:
-      # 管理员账号配置（生产环境必须在 .env 文件或环境变量中设置）
-      - ADMIN_USERNAME=${ADMIN_USERNAME}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      # 管理员账号配置（生产环境请修改）
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me-in-production}
       # 下载文件夹配置
       - DOWNLOAD_FOLDER=/app/downloads
-      # Flask密钥（生产环境必须在 .env 文件或环境变量中设置）
-      - SECRET_KEY=${SECRET_KEY}
+      # Flask密钥（生产环境必须修改）
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key-in-production}
       # 时区设置
-      - TZ=${TZ:-Asia/Shanghai} # Default for TZ is acceptable
+      - TZ=${TZ:-Asia/Shanghai}
       # 安全配置
       - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS:-3}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE:-5368709120}
@@ -100,10 +100,19 @@ networks:
 volumes:
   downloads:
     driver: local
-    # driver_opts removed to make it a true Docker-managed named volume
+    driver_opts:
+      type: none
+      o: bind
+      device: ./downloads
   config:
     driver: local
-    # driver_opts removed to make it a true Docker-managed named volume
+    driver_opts:
+      type: none
+      o: bind
+      device: ./config
   logs:
     driver: local
-    # driver_opts removed to make it a true Docker-managed named volume
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs

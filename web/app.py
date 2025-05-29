@@ -1,962 +1,1064 @@
-import sys
-import os
-# Remove the project root from sys.path to avoid conflict with local yt_dlp directory
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root in sys.path:
-    sys.path.remove(project_root)
-
 """
 yt-dlp 网页界面的 Flask 应用程序
-此 app.py 文件应位于项目根目录下的 web/ 文件夹中。
 """
 
 import os
-import sys 
 import threading
 import uuid
 import re
 import tempfile
 import logging
-import json
-import random # Added for session cleanup
-from datetime import datetime, timezone
-from urllib.parse import urlparse, unquote
-from flask import Flask, request, jsonify, render_template, send_from_directory, send_file, session, redirect, url_for, current_app, after_this_request
+from datetime import datetime
+from urllib.parse import urlparse
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file, session, redirect, url_for
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-# 确保从 site-packages 加载 yt_dlp (这是第三方库)
 from yt_dlp import YoutubeDL
-# 相对导入，因为这些文件与 app.py 在同一个 'web' 包内
 from .file_cleaner import initialize_cleanup_manager, get_cleanup_manager
 from .auth import auth_manager, login_required, admin_required, get_current_user
 
 # 配置日志
-logging.basicConfig(
-    level=os.environ.get('LOG_LEVEL', 'INFO').upper(),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)] 
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# --- 辅助函数：递归转换 set 和其他非JSON原生类型为 list/str ---
-def _make_json_serializable_recursive(obj):
-    if isinstance(obj, dict):
-        return {k: _make_json_serializable_recursive(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_make_json_serializable_recursive(elem) for elem in obj]
-    elif isinstance(obj, set):
-        return list(obj) 
-    elif isinstance(obj, datetime): 
-        return obj.isoformat()
-    elif isinstance(obj, uuid.UUID): 
-        return str(obj)
-    return obj
-
 class DownloadManager:
     """管理下载任务及其状态"""
+
     def __init__(self):
         self.downloads = {}
-        self.lock = threading.Lock() 
+        self.lock = threading.Lock()
 
     def add_download(self, download_id, url, options=None):
-        """添加新的下载任务，确保选项是可序列化的"""
+        """添加新的下载任务"""
         with self.lock:
-            serializable_options = _make_json_serializable_recursive(options or {})
             self.downloads[download_id] = {
                 'id': download_id,
                 'url': url,
-                'status': 'pending',
-                'progress': 0.0,
+                'status': 'pending',  # 等待中
+                'progress': 0,
                 'filename': None,
                 'error': None,
-                'created_at': datetime.now(timezone.utc).isoformat(),
-                'options': serializable_options,
-                'speed': None, 
-                'eta': None, 
-                'total_bytes': None,
-                'downloaded_bytes': None,
-                'elapsed': None,
-                'start_time': None,
-                'end_time': None,
+                'created_at': datetime.now().isoformat(),
+                'options': options or {}
             }
-            logger.info(f"下载任务 {download_id} 已添加 URL: {url}")
         return download_id
 
     def update_download(self, download_id, **kwargs):
-        """更新下载状态，确保传入的kwargs值是可序列化的"""
+        """更新下载状态"""
         with self.lock:
             if download_id in self.downloads:
-                update_data = _make_json_serializable_recursive(kwargs)
-                self.downloads[download_id].update(update_data)
-            else:
-                logger.warning(f"尝试更新不存在的下载ID: {download_id}")
+                self.downloads[download_id].update(kwargs)
 
     def get_download(self, download_id):
-        """获取下载状态的副本"""
+        """获取下载状态"""
         with self.lock:
-            download_item = self.downloads.get(download_id)
-            return _make_json_serializable_recursive(download_item.copy()) if download_item else None
+            return self.downloads.get(download_id)
 
     def get_all_downloads(self):
-        """获取所有下载状态的副本列表"""
+        """获取所有下载"""
         with self.lock:
-            sorted_downloads = sorted(self.downloads.values(), key=lambda x: x.get('created_at', ''), reverse=True)
-            return [_make_json_serializable_recursive(item.copy()) for item in sorted_downloads]
+            return list(self.downloads.values())
 
+
+# 全局下载管理器实例
 download_manager = DownloadManager()
 
+# 安全配置
 ALLOWED_URL_SCHEMES = ['http', 'https']
-BLOCKED_HOST_PATTERNS = [
-    re.compile(r"^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|0\.0\.0\.0|\[::1\])$", re.IGNORECASE),
-    re.compile(r"^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$"),
-    re.compile(r"^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$"),
-    re.compile(r"^192\.168\.\d{1,3}\.\d{1,3}$"),
-    re.compile(r"^169\.254\.\d{1,3}\.\d{1,3}$"),
-]
-MAX_URL_LENGTH = int(os.environ.get('MAX_URL_LENGTH', 2048))
-MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 5))
+BLOCKED_DOMAINS = ['localhost', '127.0.0.1', '0.0.0.0', '::1']
+MAX_URL_LENGTH = 2048
+MAX_CONCURRENT_DOWNLOADS = 5
 
 def validate_url(url):
+    """验证URL的安全性"""
     if not url or len(url) > MAX_URL_LENGTH:
-        return False, "URL长度无效或过长"
+        return False, "URL长度无效"
+
     try:
-        decoded_url = unquote(url)
-        parsed = urlparse(decoded_url)
+        parsed = urlparse(url)
+
+        # 检查协议
         if parsed.scheme not in ALLOWED_URL_SCHEMES:
             return False, "不支持的URL协议"
-        if not parsed.hostname: 
-            return False, "URL必须包含有效的主机名"
-        for pattern in BLOCKED_HOST_PATTERNS:
-            if pattern.match(parsed.hostname):
-                return False, f"不允许访问域名或IP地址: {parsed.hostname}"
-        import socket
-        try:
-            ip_addr_str = socket.gethostbyname(parsed.hostname)
+
+        # 检查域名
+        if parsed.hostname and parsed.hostname.lower() in BLOCKED_DOMAINS:
+            return False, "不允许的域名"
+
+        # 检查是否为内网地址
+        if parsed.hostname:
             import ipaddress
-            ip_obj = ipaddress.ip_address(ip_addr_str)
-            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_unspecified:
-                return False, f"域名解析到不允许的IP地址: {parsed.hostname} -> {ip_addr_str}"
-        except socket.gaierror:
-            logger.warning(f"域名无法解析: {parsed.hostname}")
-            return False, f"域名无法解析: {parsed.hostname}"
-        except ValueError:
-             logger.warning(f"域名解析结果不是有效IP: {parsed.hostname}")
-             return False, f"域名解析结果不是有效IP: {parsed.hostname}"
+            try:
+                ip = ipaddress.ip_address(parsed.hostname)
+                if ip.is_private or ip.is_loopback:
+                    return False, "不允许访问内网地址"
+            except ValueError:
+                # 不是IP地址，继续检查
+                pass
+
         return True, "URL有效"
     except Exception as e:
-        logger.error(f"URL验证时发生未知错误: {url}, 错误: {e}", exc_info=True)
-        return False, "URL解析或验证时发生内部错误"
+        return False, f"URL解析错误: {str(e)}"
 
 def sanitize_filename(filename):
-    if not filename: return "download_" + uuid.uuid4().hex[:8] 
-    safe_name = secure_filename(filename) 
-    safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f\x7f]', '_', safe_name) 
-    safe_name = re.sub(r'[_ ]{2,}', '_', safe_name) 
-    safe_name = safe_name.strip('. _') 
-    if not safe_name: safe_name = "download_" + uuid.uuid4().hex[:8]
-    return safe_name[:180]
+    """清理文件名，防止路径遍历攻击"""
+    if not filename:
+        return "download"
+
+    # 使用werkzeug的secure_filename
+    safe_name = secure_filename(filename)
+
+    # 额外的安全检查
+    safe_name = re.sub(r'[<>:"/\\|?*]', '_', safe_name)
+    safe_name = safe_name.strip('. ')
+
+    if not safe_name:
+        safe_name = "download"
+
+    return safe_name[:255]  # 限制文件名长度
+
 
 def create_app(config=None):
+    """创建并配置 Flask 应用程序"""
     app = Flask(__name__,
-                template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'),
-                static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static'))
-    CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}}) 
-    
-    default_download_folder = os.path.abspath(os.path.join(os.path.dirname(app.root_path), 'downloads'))
+                template_folder=os.path.join(os.path.dirname(__file__), 'templates'),
+                static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 
+    # 为所有路由启用 CORS
+    CORS(app)
+
+    # 配置应用程序
     app.config.update({
-        'SECRET_KEY': os.environ.get('SECRET_KEY', 'change-this-in-production-to-a-very-long-random-string!'),
-        'DOWNLOAD_FOLDER': os.environ.get('DOWNLOAD_FOLDER', default_download_folder),
-        'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,
-        'SESSION_COOKIE_SECURE': not app.debug and os.environ.get('FLASK_ENV', 'development') == 'production',
-        'SESSION_COOKIE_HTTPONLY': True,
-        'SESSION_COOKIE_SAMESITE': 'Lax',
+        'SECRET_KEY': os.environ.get('SECRET_KEY', 'dev-key-change-in-production'),
+        'DOWNLOAD_FOLDER': os.environ.get('DOWNLOAD_FOLDER', './downloads'),
+        'MAX_CONTENT_LENGTH': 16 * 1024 * 1024,  # 16MB 最大请求大小
     })
-    
-    if config: app.config.update(config)
-    try:
-        os.makedirs(app.config['DOWNLOAD_FOLDER'], exist_ok=True)
-        logger.info(f"下载目录: {app.config['DOWNLOAD_FOLDER']}")
-    except OSError as e:
-        logger.critical(f"创建下载目录失败 {app.config['DOWNLOAD_FOLDER']}: {e}", exc_info=True)
-        raise RuntimeError(f"无法创建下载目录: {e}") from e
-    
-    auth_manager.init_app(app)
 
-    # Periodic cleanup of expired sessions
-    @app.before_request
-    def cleanup_sessions_hook():
-        # Run cleanup with a 1% probability on each request
-        # Adjust probability as needed for your application's load
-        if random.random() < 0.01: 
-            num_cleaned = auth_manager.cleanup_expired_sessions()
-            if num_cleaned > 0:
-                logger.info(f"Cleaned up {num_cleaned} expired user sessions.")
-                
+    if config:
+        app.config.update(config)
+
+    # 确保下载文件夹存在
+    os.makedirs(app.config['DOWNLOAD_FOLDER'], exist_ok=True)
+
+    # 初始化文件清理管理器
     cleanup_config = {
-        'auto_cleanup_enabled': os.environ.get('AUTO_CLEANUP_ENABLED', 'True').lower() == 'true',
-        'cleanup_interval_hours': int(os.environ.get('CLEANUP_INTERVAL_HOURS', 1)),
-        'file_retention_hours': int(os.environ.get('FILE_RETENTION_HOURS', 24)),
-        'max_storage_mb': int(os.environ.get('MAX_STORAGE_MB', 2048)),
-        'cleanup_on_download': os.environ.get('CLEANUP_ON_DOWNLOAD', 'True').lower() == 'true',
-        'keep_recent_files': int(os.environ.get('KEEP_RECENT_FILES', 20)),
-        'temp_file_retention_minutes': int(os.environ.get('TEMP_FILE_RETENTION_MINUTES', 30)),
+        'auto_cleanup_enabled': True,
+        'cleanup_interval_hours': 1,      # 每小时检查一次
+        'file_retention_hours': 24,       # 文件保留24小时
+        'max_storage_mb': 2048,           # 最大存储2GB
+        'cleanup_on_download': True,      # 下载完成后立即清理
+        'keep_recent_files': 20,          # 至少保留最近20个文件
+        'temp_file_retention_minutes': 30, # 临时文件保留30分钟
     }
     initialize_cleanup_manager(app.config['DOWNLOAD_FOLDER'], cleanup_config)
+
+    # 注册路由
     register_routes(app)
 
-    # --- Custom Error Handlers ---
-    @app.errorhandler(400)
-    def bad_request_error(error):
-        logger.warning(f"Bad Request (400): {error.description if hasattr(error, 'description') else str(error)}")
-        return render_template('errors/400.html', error=error), 400
-
-    @app.errorhandler(401)
-    def unauthorized_error(error):
-        logger.warning(f"Unauthorized (401): {error.description if hasattr(error, 'description') else str(error)}")
-        return render_template('errors/401.html', error=error), 401
-
-    @app.errorhandler(403)
-    def forbidden_error(error):
-        logger.warning(f"Forbidden (403): {error.description if hasattr(error, 'description') else str(error)}")
-        return render_template('errors/403.html', error=error), 403
-
-    @app.errorhandler(404)
-    def not_found_error(error):
-        logger.info(f"Not Found (404): {request.path} - {error.description if hasattr(error, 'description') else str(error)}")
-        return render_template('errors/404.html', error=error), 404
-
-    @app.errorhandler(500)
-    def internal_server_error(error):
-        logger.error(f"Internal Server Error (500): {error}", exc_info=True) # Log full exception
-        return render_template('errors/500.html', error=error), 500
-        
-    # General exception handler for any unhandled exception
-    # This is a fallback, specific 500 errors should ideally be caught by the above.
-    @app.errorhandler(Exception)
-    def unhandled_exception(error):
-        logger.critical(f"Unhandled Exception: {error}", exc_info=True)
-        # Avoid leaking details, render a generic 500 page
-        return render_template('errors/500.html', error="An unexpected error occurred."), 500
-
-    logger.info("Flask app 创建并配置完成。")
     return app
 
+
 def register_routes(app):
+    """注册所有应用程序路由"""
+
     @app.route('/')
-    def index(): return render_template('index.html')
+    def index():
+        """主网页界面"""
+        return render_template('index.html')
+
     @app.route('/shortcuts-help')
-    def shortcuts_help(): return render_template('shortcuts_help.html')
+    def shortcuts_help():
+        """iOS快捷指令使用指南"""
+        return render_template('shortcuts_help.html')
 
-    @app.route('/login', methods=['GET', 'POST'])
+    # 认证相关路由
+    @app.route('/login')
     def login():
-        if get_current_user(): return redirect(url_for('index'))
-        if request.method == 'POST':
-            username = request.form.get('username')
-            password = request.form.get('password')
-            if not username or not password: return render_template('login.html', error='用户名和密码不能为空')
-            if auth_manager.verify_credentials(username, password):
-                session_token = auth_manager.create_session(username)
-                session['auth_token'], session['username'] = session_token, username
-                logger.info(f"用户 {username} 通过表单登录成功。")
-                return redirect(url_for('index'))
-            else:
-                logger.warning(f"用户 {username} 表单登录失败。")
-                return render_template('login.html', error='用户名或密码错误')
+        """登录页面"""
         return render_template('login.html')
-
-    @app.route('/logout')
-    @login_required
-    def logout_route():
-        user = get_current_user()
-        auth_token = session.pop('auth_token', None)
-        session.pop('username', None)
-        if auth_token: auth_manager.destroy_session(auth_token)
-        logger.info(f"用户 {user or '(unknown)'} 已登出。")
-        return redirect(url_for('login'))
 
     @app.route('/admin')
     @admin_required
-    def admin(): return render_template('admin.html')
+    def admin():
+        """管理员控制台"""
+        return render_template('admin.html')
 
     @app.route('/api/auth/login', methods=['POST'])
     def api_login():
+        """用户登录API"""
         try:
             data = request.get_json()
-            if not data: return jsonify({'error': '需要提供登录数据'}), 400
-            username, password = data.get('username'), data.get('password')
-            if not username or not password: return jsonify({'error': '用户名和密码不能为空'}), 400
+            if not data:
+                return jsonify({'error': '需要提供登录数据'}), 400
+
+            username = data.get('username')
+            password = data.get('password')
+            remember = data.get('remember', False)
+
+            if not username or not password:
+                return jsonify({'error': '用户名和密码不能为空'}), 400
+
+            # 验证用户凭据
             if auth_manager.verify_credentials(username, password):
+                # 创建会话
                 session_token = auth_manager.create_session(username)
-                session['auth_token'], session['username'] = session_token, username
-                logger.info(f"用户 {username} 通过 API 登录成功。")
-                return jsonify({'success': True, 'message': '登录成功', 'token': session_token, 'username': username})
+
+                # 保存到Flask session
+                session['auth_token'] = session_token
+                session['username'] = username
+
+                return jsonify({
+                    'success': True,
+                    'message': '登录成功',
+                    'token': session_token,
+                    'username': username
+                })
             else:
-                logger.warning(f"用户 {username} API 登录失败。")
                 return jsonify({'error': '用户名或密码错误'}), 401
+
         except Exception as e:
-            logger.error(f"API登录时发生错误: {e}", exc_info=True)
-            return jsonify({'error': '服务器内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/auth/logout', methods=['POST'])
     def api_logout():
+        """用户登出API"""
         try:
-            token_to_destroy, user_id = None, "User (token/session not found)"
-            auth_header = request.headers.get('Authorization')
-            if auth_header and auth_header.startswith('Bearer '): token_to_destroy = auth_header.split(' ')[1]
-            elif 'auth_token' in session: token_to_destroy = session['auth_token']
-            if token_to_destroy:
-                user_id = auth_manager.get_session_user(token_to_destroy) or user_id
-                auth_manager.destroy_session(token_to_destroy)
-            session.pop('auth_token', None); session.pop('username', None)
-            logger.info(f"{user_id} 通过 API 登出。")
-            return jsonify({'success': True, 'message': '已成功登出'})
+            # 获取会话token
+            auth_token = request.headers.get('Authorization')
+            if auth_token and auth_token.startswith('Bearer '):
+                token = auth_token.split(' ')[1]
+                auth_manager.destroy_session(token)
+
+            if 'auth_token' in session:
+                auth_manager.destroy_session(session['auth_token'])
+                session.clear()
+
+            return jsonify({
+                'success': True,
+                'message': '已成功登出'
+            })
+
         except Exception as e:
-            logger.error(f"API登出时发生错误: {e}", exc_info=True)
-            return jsonify({'error': '服务器内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/auth/verify', methods=['GET'])
     def api_verify():
+        """验证会话有效性"""
         try:
-            token_to_verify, is_from_header = None, False
-            auth_header = request.headers.get('Authorization')
-            if auth_header and auth_header.startswith('Bearer '):
-                token_to_verify, is_from_header = auth_header.split(' ')[1], True
-            elif 'auth_token' in session: token_to_verify = session['auth_token']
-            if token_to_verify and auth_manager.verify_session(token_to_verify):
-                username = auth_manager.get_session_user(token_to_verify)
-                if username:
-                    if is_from_header and (not session.get('auth_token') or session.get('username') != username):
-                        session['auth_token'], session['username'] = token_to_verify, username
-                    return jsonify({'valid': True, 'username': username})
-            session.pop('auth_token', None); session.pop('username', None) 
-            return jsonify({'valid': False, 'message': '会话无效或已过期'}), 401
+            # 检查会话token
+            auth_token = request.headers.get('Authorization')
+            if auth_token and auth_token.startswith('Bearer '):
+                token = auth_token.split(' ')[1]
+                if auth_manager.verify_session(token):
+                    username = auth_manager.get_session_user(token)
+                    return jsonify({
+                        'valid': True,
+                        'username': username
+                    })
+
+            # 检查Flask session
+            if 'auth_token' in session:
+                if auth_manager.verify_session(session['auth_token']):
+                    return jsonify({
+                        'valid': True,
+                        'username': session.get('username')
+                    })
+
+            return jsonify({'valid': False}), 401
+
         except Exception as e:
-            logger.error(f"API验证会话时发生错误: {e}", exc_info=True)
-            return jsonify({'error': '服务器内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/info', methods=['POST'])
-    @login_required
     def get_video_info():
-        url_param = None
+        """获取视频信息而不下载"""
         try:
             data = request.get_json()
-            if not data or 'url' not in data: return jsonify({'error': '需要提供 URL'}), 400
-            url_param = data['url'].strip()
-            is_valid, error_msg = validate_url(url_param)
-            if not is_valid:
-                logger.warning(f"无效的URL尝试获取信息: {url_param} - {error_msg}")
-                return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
-            ydl_opts = {'quiet': True, 'no_warnings': True, 'extract_flat': 'in_playlist', 'skip_download': True}
-            with YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(url_param, download=False)
-            
-            display_info = info.get('entries')[0] if info.get('_type') == 'playlist' and info.get('entries') else info
-            if not display_info: display_info = info
+            if not data or 'url' not in data:
+                return jsonify({'error': '需要提供 URL'}), 400
 
-            result = {
-                'title': display_info.get('title'), 'description': display_info.get('description'),
-                'duration': display_info.get('duration_string') or display_info.get('duration'),
-                'uploader': display_info.get('uploader'), 'upload_date': display_info.get('upload_date'),
-                'view_count': display_info.get('view_count'),
-                'thumbnail': display_info.get('thumbnail') or (display_info.get('thumbnails')[-1]['url'] if display_info.get('thumbnails') else None),
-                'formats': [],
-                'is_playlist': info.get('_type') == 'playlist',
-                'playlist_title': info.get('title') if info.get('_type') == 'playlist' else None,
-                'playlist_count': info.get('playlist_count') if info.get('_type') == 'playlist' else None,
+            url = data['url'].strip()
+
+            # 验证URL安全性
+            is_valid, error_msg = validate_url(url)
+            if not is_valid:
+                logger.warning(f"Invalid URL attempted: {url} - {error_msg}")
+                return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
+
+            # 配置 yt-dlp 选项，仅用于信息提取
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': False,
+                'skip_download': True,
             }
-            if 'formats' in display_info and display_info['formats'] is not None:
-                for fmt in display_info['formats']:
-                    if not isinstance(fmt, dict): continue
-                    result['formats'].append({
-                        'format_id': fmt.get('format_id'), 'ext': fmt.get('ext'),
-                        'quality_note': fmt.get('format_note'),
-                        'filesize': fmt.get('filesize') or fmt.get('filesize_approx'),
-                        'resolution': fmt.get('resolution') or (f"{fmt.get('width')}x{fmt.get('height')}" if fmt.get('width') and fmt.get('height') else None),
-                        'vcodec': fmt.get('vcodec'), 'acodec': fmt.get('acodec'),
-                        'fps': fmt.get('fps'), 'abr': fmt.get('abr'), 'vbr': fmt.get('vbr'),
-                    })
-            return jsonify(_make_json_serializable_recursive(result))
+
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                # 返回相关信息
+                result = {
+                    'title': info.get('title'),
+                    'description': info.get('description'),
+                    'duration': info.get('duration'),
+                    'uploader': info.get('uploader'),
+                    'upload_date': info.get('upload_date'),
+                    'view_count': info.get('view_count'),
+                    'thumbnail': info.get('thumbnail'),
+                    'formats': []
+                }
+
+                # 添加格式信息
+                if 'formats' in info:
+                    for fmt in info['formats']:
+                        result['formats'].append({
+                            'format_id': fmt.get('format_id'),
+                            'ext': fmt.get('ext'),
+                            'quality': fmt.get('quality'),
+                            'filesize': fmt.get('filesize'),
+                            'format_note': fmt.get('format_note'),
+                        })
+
+                return jsonify(result)
+
         except Exception as e:
-            logger.error(f"获取视频信息时发生错误: URL='{url_param}', 错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '获取视频信息时发生内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/download', methods=['POST'])
-    @login_required
     def start_download():
-        url_param = None
+        """开始视频下载 - 支持高级选项"""
         try:
             data = request.get_json()
-            if not data or 'url' not in data: return jsonify({'error': '需要提供 URL'}), 400
-            url_param = data['url'].strip()
-            is_valid, error_msg = validate_url(url_param)
+            if not data or 'url' not in data:
+                return jsonify({'error': '需要提供 URL'}), 400
+
+            url = data['url'].strip()
+
+            # 验证URL安全性
+            is_valid, error_msg = validate_url(url)
             if not is_valid:
-                logger.warning(f"无效的URL尝试下载: {url_param} - {error_msg}")
+                logger.warning(f"Invalid URL attempted: {url} - {error_msg}")
                 return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
-            with download_manager.lock:
-                active_downloads = len([d for d in download_manager.get_all_downloads() if d['status'] in ['pending', 'downloading']])
+
+            # 检查并发下载限制
+            active_downloads = len([d for d in download_manager.get_all_downloads()
+                                  if d['status'] in ['pending', 'downloading']])
             if active_downloads >= MAX_CONCURRENT_DOWNLOADS:
                 return jsonify({'error': f'并发下载数量已达上限({MAX_CONCURRENT_DOWNLOADS})'}), 429
+
+            # 生成唯一的下载 ID
             download_id = str(uuid.uuid4())
-            ydl_opts = _build_ydl_options(data, current_app.config['DOWNLOAD_FOLDER'])
-            download_manager.add_download(download_id, url_param, ydl_opts)
-            thread = threading.Thread(target=_download_worker, args=(download_id, url_param, ydl_opts))
+
+            # 构建 yt-dlp 选项
+            ydl_opts = _build_ydl_options(data, app.config['DOWNLOAD_FOLDER'])
+
+            # 将下载添加到管理器
+            download_manager.add_download(download_id, url, ydl_opts)
+
+            # 在后台线程中开始下载
+            thread = threading.Thread(target=_download_worker, args=(download_id, url, ydl_opts))
             thread.daemon = True
             thread.start()
-            logger.info(f"已开始下载 {download_id} URL: {url_param}")
-            return jsonify({'download_id': download_id, 'status': 'started', 'message': '下载已成功开始'})
+
+            logger.info(f"Started download {download_id} for URL: {url}")
+            return jsonify({
+                'download_id': download_id,
+                'status': 'started',
+                'message': '下载已成功开始'
+            })
+
         except Exception as e:
-            logger.error(f"开始下载时发生错误: URL='{url_param}', {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '开始下载时发生内部错误'}), 500
+            logger.error(f"Download start error: {str(e)}")
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/download/<download_id>/status')
-    @login_required 
     def get_download_status(download_id):
-        download_info = download_manager.get_download(download_id) 
-        if not download_info:
+        """获取下载状态"""
+        download = download_manager.get_download(download_id)
+        if not download:
             return jsonify({'error': '未找到下载'}), 404
-        return jsonify(_make_json_serializable_recursive(download_info))
+
+        return jsonify(download)
 
     @app.route('/api/downloads')
-    @login_required
     def list_downloads():
+        """列出所有下载"""
         downloads = download_manager.get_all_downloads()
-        return jsonify({'downloads': [_make_json_serializable_recursive(d) for d in downloads]})
+        return jsonify({'downloads': downloads})
 
     @app.route('/api/shortcuts/download', methods=['POST'])
     def shortcuts_download():
-        url_param = None
+        """iOS 快捷指令兼容的下载端点 - 异步模式"""
         try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
-            if not data or 'url' not in data: return jsonify({'error': '需要提供 URL'}), 400
-            url_param = data['url'].strip()
-            is_valid, error_msg = validate_url(url_param)
-            if not is_valid:
-                logger.warning(f"快捷指令无效URL: {url_param} - {error_msg}")
-                return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
-            
+            # 处理 JSON 和表单数据
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
+
+            if not data or 'url' not in data:
+                return jsonify({'error': '需要提供 URL'}), 400
+
+            url = data['url']
             audio_only = data.get('audio_only', 'false').lower() == 'true'
-            quality_param = data.get('quality', 'bestvideo+bestaudio/best' if not audio_only else 'bestaudio/best')
-            output_format_param = data.get('output_format', 'auto')
+            quality = data.get('quality', 'best')
+
+            # 生成唯一的下载 ID
             download_id = str(uuid.uuid4())
-            options_data = {
-                'audio_only': audio_only, 'format_string': quality_param, 
-                'output_format': output_format_param,
-                'outtmpl_override': os.path.join(current_app.config['DOWNLOAD_FOLDER'], f"{download_id}_%(title).180B.%(ext)s")
+
+            # 为 iOS 快捷指令配置下载选项
+            ydl_opts = {
+                'outtmpl': os.path.join(app.config['DOWNLOAD_FOLDER'], '%(title)s.%(ext)s'),
+                'format': 'bestaudio/best' if audio_only else quality,
+                'quiet': True,
+                'no_warnings': True,
             }
-            ydl_opts = _build_ydl_options(options_data, current_app.config['DOWNLOAD_FOLDER'])
-            download_manager.add_download(download_id, url_param, ydl_opts)
-            thread = threading.Thread(target=_download_worker, args=(download_id, url_param, ydl_opts))
+
+            # 将下载添加到管理器
+            download_manager.add_download(download_id, url, ydl_opts)
+
+            # 在后台线程中开始下载
+            thread = threading.Thread(target=_download_worker, args=(download_id, url, ydl_opts))
             thread.daemon = True
             thread.start()
-            logger.info(f"快捷指令下载已开始: {download_id} for {url_param}")
+
+            # 返回 iOS 快捷指令兼容的响应
             return jsonify({
-                'success': True, 'download_id': download_id,
-                'status_url': url_for('get_download_status', download_id=download_id, _external=True),
-                'file_url': url_for('shortcuts_get_file', download_id=download_id, _external=True),
-                'message': '下载已开始'
+                'success': True,
+                'download_id': download_id,
+                'status_url': f'/api/download/{download_id}/status',
+                'download_url': f'/api/shortcuts/download/{download_id}/file',
+                'message': '下载已成功开始'
             })
+
         except Exception as e:
-            logger.error(f"快捷指令下载错误: URL='{url_param}', {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'success': False, 'error': '快捷指令下载时发生服务器错误'}), 500
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/shortcuts/download-direct', methods=['POST'])
     def shortcuts_download_direct():
-        url_param = None
-        final_filepath_to_clean = None 
+        """iOS 快捷指令直接下载端点 - 同步模式"""
         try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
-            if not data or 'url' not in data: return jsonify({'error': '需要提供 URL'}), 400
-            url_param = data['url'].strip()
-            is_valid, error_msg = validate_url(url_param)
-            if not is_valid:
-                logger.warning(f"快捷指令直接下载无效URL: {url_param} - {error_msg}")
-                return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
+            # 处理 JSON 和表单数据
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
 
+            if not data or 'url' not in data:
+                return jsonify({'error': '需要提供 URL'}), 400
+
+            url = data['url']
             audio_only = data.get('audio_only', 'false').lower() == 'true'
-            quality_param = data.get('quality', 'bestvideo+bestaudio/best' if not audio_only else 'bestaudio/best')
-            output_format_param = data.get('output_format', 'auto')
-            temp_basename = f"direct_{uuid.uuid4().hex}"
-            options_data = {
-                'audio_only': audio_only, 'format_string': quality_param,
-                'output_format': output_format_param,
-                'outtmpl_direct': os.path.join(current_app.config['DOWNLOAD_FOLDER'], temp_basename + '.%(ext)s')
+            quality = data.get('quality', 'best')
+
+            # 临时文件名
+            temp_filename = f"temp_{uuid.uuid4().hex}"
+            temp_path = os.path.join(app.config['DOWNLOAD_FOLDER'], temp_filename)
+
+            # 配置下载选项 - 直接下载到临时位置
+            ydl_opts = {
+                'outtmpl': temp_path + '.%(ext)s',
+                'format': 'bestaudio/best' if audio_only else quality,
+                'quiet': True,
+                'no_warnings': True,
             }
-            ydl_opts = _build_ydl_options(options_data, current_app.config['DOWNLOAD_FOLDER'])
-            ydl_opts['ffmpeg_location'] = os.environ.get('FFMPEG_PATH', 'ffmpeg')
-            
-            logger.info(f"快捷指令直接下载: URL={url_param}, Opts={ydl_opts}")
+
+            # 直接下载（同步）
             with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url_param, download=True)
-                final_filepath = None
-                if info.get('requested_downloads') and info['requested_downloads'][0].get('filepath'):
-                    final_filepath = info['requested_downloads'][0]['filepath']
+                info = ydl.extract_info(url, download=True)
+
+                # 找到下载的文件
+                downloaded_file = None
+                for file in os.listdir(app.config['DOWNLOAD_FOLDER']):
+                    if file.startswith(temp_filename):
+                        downloaded_file = file
+                        break
+
+                if downloaded_file:
+                    file_path = os.path.join(app.config['DOWNLOAD_FOLDER'], downloaded_file)
+
+                    # 返回文件内容
+                    def remove_file():
+                        try:
+                            os.remove(file_path)
+                        except:
+                            pass
+
+                    # 设置适当的Content-Type
+                    if audio_only:
+                        mimetype = 'audio/mpeg'
+                    else:
+                        mimetype = 'video/mp4'
+
+                    return send_from_directory(
+                        app.config['DOWNLOAD_FOLDER'],
+                        downloaded_file,
+                        as_attachment=True,
+                        download_name=f"{info.get('title', 'video')}.{downloaded_file.split('.')[-1]}",
+                        mimetype=mimetype
+                    )
                 else:
-                    for fname_scan in os.listdir(current_app.config['DOWNLOAD_FOLDER']):
-                        if fname_scan.startswith(temp_basename):
-                            final_filepath = os.path.join(current_app.config['DOWNLOAD_FOLDER'], fname_scan)
-                            break
-                if not final_filepath or not os.path.exists(final_filepath):
-                    logger.error(f"直接下载后未找到文件: basename={temp_basename}, URL={url_param}")
-                    return jsonify({'success': False, 'error': '下载后文件未找到'}), 500
-                
-                final_filepath_to_clean = final_filepath 
-                actual_filename = os.path.basename(final_filepath)
-                actual_ext = actual_filename.split('.')[-1].lower() if '.' in actual_filename else ''
-                mimetype = {'mp3': 'audio/mpeg', 'm4a': 'audio/aac', 'aac': 'audio/aac', 
-                            'mp4': 'video/mp4', 'webm': 'video/webm', 'mkv': 'video/x-matroska', 
-                            'flac': 'audio/flac', 'wav': 'audio/wav'}.get(actual_ext, 'application/octet-stream')
-                download_display_name = sanitize_filename(info.get('title', temp_basename)) + (f'.{actual_ext}' if actual_ext else '')
-                
-                response = send_file(final_filepath, as_attachment=True, download_name=download_display_name, mimetype=mimetype)
-                
-                @after_this_request 
-                def cleanup_direct_download_file(response_after):
-                    try:
-                        if final_filepath_to_clean and os.path.exists(final_filepath_to_clean):
-                            os.remove(final_filepath_to_clean)
-                            logger.info(f"已清理直接下载的临时文件: {final_filepath_to_clean}")
-                    except Exception as e_clean:
-                        logger.error(f"清理直接下载文件失败 {final_filepath_to_clean}: {e_clean}")
-                    return response_after
-                return response
-            
+                    return jsonify({'success': False, 'error': '下载失败'}), 500
+
         except Exception as e:
-            logger.error(f"快捷指令直接下载时发生严重错误: URL='{url_param}', {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            if final_filepath_to_clean and os.path.exists(final_filepath_to_clean):
-                try: os.remove(final_filepath_to_clean)
-                except: pass # Log this failure too if needed
-            return jsonify({'success': False, 'error': '直接下载失败，发生服务器错误'}), 500
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/shortcuts/download/<download_id>/file')
-    @login_required 
     def shortcuts_get_file(download_id):
-        download_info = download_manager.get_download(download_id)
-        if not download_info: return jsonify({'error': '未找到下载'}), 404
-        if download_info['status'] != 'completed':
-            return jsonify({'error': '下载未完成', 'status': download_info['status'],
-                            'progress': _make_json_serializable_recursive(download_info.get('progress', 0))}), 202
-        if not download_info.get('filename'): return jsonify({'error': '文件名丢失'}), 404
-        filename = sanitize_filename(download_info['filename'])
-        return send_from_directory(current_app.config['DOWNLOAD_FOLDER'], filename, as_attachment=True, download_name=filename)
+        """获取iOS快捷指令下载的文件"""
+        download = download_manager.get_download(download_id)
+        if not download:
+            return jsonify({'error': '未找到下载'}), 404
+
+        if download['status'] != 'completed':
+            return jsonify({
+                'error': '下载未完成',
+                'status': download['status'],
+                'progress': download.get('progress', 0)
+            }), 202
+
+        if 'filename' not in download:
+            return jsonify({'error': '文件不存在'}), 404
+
+        filename = download['filename']
+        file_path = os.path.join(app.config['DOWNLOAD_FOLDER'], filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': '文件已被删除'}), 404
+
+        # 返回文件，适合iOS快捷指令接收
+        return send_from_directory(
+            app.config['DOWNLOAD_FOLDER'],
+            filename,
+            as_attachment=True,
+            download_name=filename
+        )
 
     @app.route('/api/formats', methods=['POST'])
-    @login_required
     def get_available_formats():
-        url_param = None
+        """获取视频可用格式列表 - 用于快捷指令动态选择"""
         try:
-            data = request.get_json(); 
-            if not data or 'url' not in data: return jsonify({'error': '需要提供 URL'}), 400
-            url_param = data['url'].strip()
-            is_valid, err_msg = validate_url(url_param); 
-            if not is_valid: 
-                logger.warning(f"获取格式时使用了无效URL: {url_param} - {err_msg}")
-                return jsonify({'error': f'URL验证失败: {err_msg}'}), 400
-            ydl_opts = {'quiet': True, 'no_warnings': True, 'skip_download': True}
-            with YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(url_param, download=False)
-            formats_list = []
-            if 'formats' in info and info['formats'] is not None:
-                for f_info in info['formats']:
-                    if not isinstance(f_info, dict): continue
-                    formats_list.append({
-                        'format_id': f_info.get('format_id'), 'ext': f_info.get('ext'),
-                        'quality_note': f_info.get('format_note', str(f_info.get('quality', ''))),
-                        'filesize_str': f_info.get('filesize_str') or (f"{round(f_info.get('filesize', 0) / (1024*1024), 2)}MB" if f_info.get('filesize') else "N/A"),
-                        'vcodec': f_info.get('vcodec', 'none'), 'acodec': f_info.get('acodec', 'none'),
-                        'resolution': f_info.get('resolution') or (f"{f_info.get('width')}x{f_info.get('height')}" if f_info.get('width') and f_info.get('height') else None),
-                    })
-            shortcut_options = []
-            if any(f.get('vcodec') != 'none' for f in formats_list):
-                shortcut_options.append({'title': '📺 最佳视频 (MP4)', 'value': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best', 'type': 'video'})
-                shortcut_options.append({'title': '📱 720p 视频 (MP4)', 'value': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]', 'type': 'video'})
-            if any(f.get('acodec') != 'none' for f in formats_list):
-                shortcut_options.append({'title': '🎵 最佳音频 (M4A/Opus)', 'value': 'bestaudio/best', 'type': 'audio'})
-                shortcut_options.append({'title': '🎧 MP3 (192kbps)', 'value': 'mp3_192k_convert', 'type': 'audio_convert'})
-            return jsonify(_make_json_serializable_recursive({
-                'title': info.get('title', '未知标题'), 'uploader': info.get('uploader'),
-                'duration_string': info.get('duration_string'), 'formats': formats_list,
-                'shortcut_options': shortcut_options
-            }))
+            data = request.get_json()
+            if not data or 'url' not in data:
+                return jsonify({'error': '需要提供 URL'}), 400
+
+            url = data['url']
+
+            # 配置 yt-dlp 选项，仅用于格式提取
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'listformats': True,
+                'skip_download': True,
+            }
+
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                formats = []
+                if 'formats' in info:
+                    for f in info['formats']:
+                        format_info = {
+                            'format_id': f.get('format_id'),
+                            'ext': f.get('ext'),
+                            'quality': f.get('format_note', ''),
+                            'filesize': f.get('filesize'),
+                            'vcodec': f.get('vcodec', 'none'),
+                            'acodec': f.get('acodec', 'none'),
+                            'height': f.get('height'),
+                            'width': f.get('width'),
+                            'fps': f.get('fps'),
+                            'abr': f.get('abr'),  # 音频比特率
+                            'vbr': f.get('vbr'),  # 视频比特率
+                        }
+                        formats.append(format_info)
+
+                # 生成快捷指令友好的格式选项
+                shortcut_options = []
+
+                # 视频格式选项
+                video_qualities = ['1080', '720', '480', '360']
+                for quality in video_qualities:
+                    matching_formats = [f for f in formats if f.get('height') == int(quality)]
+                    if matching_formats:
+                        shortcut_options.append({
+                            'title': f'📺 {quality}P视频',
+                            'subtitle': f'高度{quality}像素',
+                            'value': f'best[height<={quality}]',
+                            'type': 'video'
+                        })
+
+                # 音频格式选项
+                audio_options = [
+                    {'title': '🎵 高品质MP3', 'subtitle': '320kbps', 'value': 'mp3_320', 'type': 'audio'},
+                    {'title': '🎶 标准MP3', 'subtitle': '192kbps', 'value': 'mp3_192', 'type': 'audio'},
+                    {'title': '🔊 AAC音频', 'subtitle': '高效编码', 'value': 'aac', 'type': 'audio'},
+                    {'title': '💎 FLAC无损', 'subtitle': '无损压缩', 'value': 'flac', 'type': 'audio'},
+                ]
+                shortcut_options.extend(audio_options)
+
+                return jsonify({
+                    'title': info.get('title', '未知标题'),
+                    'duration': info.get('duration'),
+                    'uploader': info.get('uploader'),
+                    'formats': formats,
+                    'shortcut_options': shortcut_options
+                })
+
         except Exception as e:
-            logger.error(f"获取格式列表时发生错误: URL='{url_param}', {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '获取可用格式时发生内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/admin/update-check', methods=['GET'])
     @admin_required
     def check_update():
+        """检查是否有新版本可用"""
         try:
-            current_v = _get_current_version()
-            return jsonify(_make_json_serializable_recursive({
-                'update_available': None, 
-                'message': '请通过更新Docker镜像或在服务器上手动运行 "pip install --upgrade yt-dlp" 来更新yt-dlp。',
-                'current_version': current_v,
-            }))
+            import subprocess
+            import json
+
+            # 执行更新检查脚本
+            result = subprocess.run(
+                ['python3', 'update_yt_dlp.py', '--check'],
+                capture_output=True,
+                text=True,
+                cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            )
+
+            if result.returncode == 0:
+                return jsonify({
+                    'update_available': False,
+                    'message': '已是最新版本',
+                    'current_version': _get_current_version(),
+                    'latest_version': _get_current_version()
+                })
+            else:
+                return jsonify({
+                    'update_available': True,
+                    'message': '有新版本可用',
+                    'current_version': _get_current_version(),
+                    'latest_version': 'checking...'
+                })
+
         except Exception as e:
-            logger.error(f"检查更新时发生错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '检查更新时发生内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/admin/update', methods=['POST'])
     @admin_required
     def start_update():
+        """开始更新过程"""
         try:
-            logger.warning(f"用户 {get_current_user()} 尝试从API触发更新。此功能已禁用。")
+            import subprocess
+            import threading
+
+            def update_worker():
+                """后台更新工作线程"""
+                try:
+                    subprocess.run(
+                        ['python3', 'update_yt_dlp.py', '--force'],
+                        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                    )
+                except Exception as e:
+                    print(f"更新失败: {e}")
+
+            # 在后台线程中执行更新
+            thread = threading.Thread(target=update_worker)
+            thread.daemon = True
+            thread.start()
+
             return jsonify({
-                'success': False,
-                'message': '此功能已禁用。请通过更新和重新构建Docker镜像来更新yt-dlp。'
-            }), 403 
+                'success': True,
+                'message': '更新已开始，请稍后刷新页面查看结果'
+            })
+
         except Exception as e:
-            logger.error(f"启动更新时发生错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '启动更新时发生内部错误'}), 500
-        
+            return jsonify({'error': str(e)}), 500
+
     @app.route('/api/admin/version', methods=['GET'])
     @admin_required
     def get_version_info():
+        """获取版本信息"""
         try:
-            return jsonify(_make_json_serializable_recursive({
-                'yt_dlp_version': _get_current_version(),
-                'web_interface_version': os.environ.get('APP_VERSION', '1.2.3'), # 更新一个示例版本号
-                'last_yt_dlp_update_check': _get_last_update_time() 
-            }))
+            current_version = _get_current_version()
+            return jsonify({
+                'current_version': current_version,
+                'web_version': '1.0.0',
+                'last_update': _get_last_update_time()
+            })
         except Exception as e:
-            logger.error(f"获取版本信息时发生错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '获取版本信息时发生内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/shortcuts/download-file/<shortcut_type>')
     def download_shortcut_file(shortcut_type):
+        """提供iOS快捷指令文件下载"""
         try:
-            shortcuts_dir = os.path.join(current_app.static_folder, 'shortcuts')
-            allowed_shortcuts = {
-                'smart_downloader': 'SmartVideoDownloader.shortcut',
-                'audio_extractor': 'AudioExtractor.shortcut',
-                '720p_downloader': '720PDownloader.shortcut',
-            } 
-            if shortcut_type not in allowed_shortcuts:
+            # 根据类型生成快捷指令配置
+            shortcut_config = _generate_shortcut_config(shortcut_type)
+
+            if not shortcut_config:
                 return jsonify({'error': '未知的快捷指令类型'}), 404
-            safe_filename = allowed_shortcuts[shortcut_type]
-            file_path = os.path.join(shortcuts_dir, safe_filename)
-            if not os.path.isfile(file_path):
-                logger.error(f"快捷指令文件未找到: {file_path}")
-                return jsonify({'error': '快捷指令文件不存在'}), 404
-            logger.info(f"提供快捷指令文件下载: {safe_filename}")
-            return send_from_directory(
-                shortcuts_dir, safe_filename, as_attachment=True,
-                download_name=safe_filename, mimetype='application/vnd.apple.shortcut' 
+
+            # 创建临时文件
+            import tempfile
+            import json
+
+            temp_file = tempfile.NamedTemporaryFile(
+                mode='w',
+                suffix='.shortcut',
+                delete=False,
+                encoding='utf-8'
             )
+
+            json.dump(shortcut_config, temp_file, ensure_ascii=False, indent=2)
+            temp_file.close()
+
+            # 返回文件
+            return send_file(
+                temp_file.name,
+                as_attachment=True,
+                download_name=f"{shortcut_config['name']}.shortcut",
+                mimetype='application/json'
+            )
+
         except Exception as e:
-            logger.error(f"下载快捷指令文件时发生错误: {shortcut_type}, {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '下载快捷指令文件时发生服务器内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/admin/cleanup', methods=['POST'])
     @admin_required
     def manual_cleanup():
+        """手动触发文件清理"""
         try:
             cleanup_mgr = get_cleanup_manager()
-            if not cleanup_mgr: return jsonify({'error': '清理管理器未初始化'}), 500
-            cleaned_count, cleaned_size_bytes = cleanup_mgr.cleanup_files(force_all=True)
+            if not cleanup_mgr:
+                return jsonify({'error': '清理管理器未初始化'}), 500
+
+            cleaned_count = cleanup_mgr.cleanup_files()
             storage_info = cleanup_mgr.get_storage_info()
-            cleaned_size_mb = round(cleaned_size_bytes / (1024*1024), 2)
-            logger.info(f"手动清理完成: 删除了 {cleaned_count} 个文件, 总大小 {cleaned_size_mb} MB. 用户: {get_current_user()}")
-            return jsonify(_make_json_serializable_recursive({
-                'success': True, 'cleaned_files': cleaned_count, 
-                'cleaned_size_mb': cleaned_size_mb, 'storage_info': storage_info,
-                'message': f'清理完成，删除了 {cleaned_count} 个文件 (约 {cleaned_size_mb} MB)'
-            }))
+
+            return jsonify({
+                'success': True,
+                'cleaned_files': cleaned_count,
+                'storage_info': storage_info,
+                'message': f'清理完成，删除了 {cleaned_count} 个文件'
+            })
+
         except Exception as e:
-            logger.error(f"手动清理时发生错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '手动清理时发生内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/admin/storage-info', methods=['GET'])
     @admin_required
     def get_storage_info():
+        """获取存储信息"""
         try:
             cleanup_mgr = get_cleanup_manager()
-            if not cleanup_mgr: return jsonify({'error': '清理管理器未初始化'}), 500
-            return jsonify(_make_json_serializable_recursive(cleanup_mgr.get_storage_info()))
+            if not cleanup_mgr:
+                return jsonify({'error': '清理管理器未初始化'}), 500
+
+            storage_info = cleanup_mgr.get_storage_info()
+            return jsonify(storage_info)
+
         except Exception as e:
-            logger.error(f"获取存储信息时发生错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '获取存储信息时发生内部错误'}), 500
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/api/admin/cleanup-config', methods=['GET', 'POST'])
     @admin_required
-    def cleanup_config_route():
+    def cleanup_config():
+        """获取或更新清理配置"""
         try:
             cleanup_mgr = get_cleanup_manager()
-            if not cleanup_mgr: return jsonify({'error': '清理管理器未初始化'}), 500
+            if not cleanup_mgr:
+                return jsonify({'error': '清理管理器未初始化'}), 500
+
             if request.method == 'GET':
-                return jsonify(_make_json_serializable_recursive(cleanup_mgr.get_config()))
+                return jsonify(cleanup_mgr.settings)
+
             elif request.method == 'POST':
-                new_config_data = request.get_json()
-                if not new_config_data: return jsonify({'error': '需要提供配置数据'}), 400
-                validated_update = {}
-                expected_types = {
-                    'auto_cleanup_enabled': bool, 'cleanup_interval_hours': int,
-                    'file_retention_hours': int, 'max_storage_mb': int,
-                    'cleanup_on_download': bool, 'keep_recent_files': int,
-                    'temp_file_retention_minutes': int
-                }
-                for key, expected_type in expected_types.items():
-                    if key in new_config_data: 
-                        try:
-                            if expected_type == bool:
-                                validated_update[key] = str(new_config_data[key]).lower() in ['true', '1', 't', 'yes', 'on']
-                            else:
-                                validated_update[key] = expected_type(new_config_data[key])
-                        except (ValueError, TypeError):
-                            return jsonify({'error': f"配置项 '{key}' 的值 '{new_config_data[key]}' 类型不正确或无效 (期望 {expected_type.__name__})"}), 400
-                
-                cleanup_mgr.update_config(validated_update)
-                logger.info(f"清理配置已更新为: {cleanup_mgr.get_config()} by {get_current_user()}")
-                return jsonify(_make_json_serializable_recursive({
-                    'success': True, 'message': '配置已更新', 'config': cleanup_mgr.get_config()
-                }))
-        except Exception as e:
-            logger.error(f"处理清理配置时发生错误: {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '处理清理配置时发生内部错误'}), 500
+                new_config = request.get_json()
+                if not new_config:
+                    return jsonify({'error': '需要提供配置数据'}), 400
 
-    @app.route('/downloads/<path:filename>')
-    @login_required
+                cleanup_mgr.update_config(new_config)
+                return jsonify({
+                    'success': True,
+                    'message': '配置已更新',
+                    'config': cleanup_mgr.settings
+                })
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/downloads/<filename>')
     def download_file(filename):
-        safe_filename = secure_filename(filename) 
-        if not safe_filename or safe_filename != filename : 
-            logger.warning(f"尝试下载不安全或被修改的文件名: original='{filename}', sanitized='{safe_filename}' by user {get_current_user()}")
-            return jsonify({'error': '无效的文件名或路径'}), 400
-        logger.info(f"用户 {get_current_user()} 请求下载文件: {safe_filename}")
-        try:
-            download_directory = current_app.config['DOWNLOAD_FOLDER']
-            full_path = os.path.normpath(os.path.join(download_directory, safe_filename))
-            # 再次确认路径安全，防止拼接后产生意外 (更严格的检查)
-            # os.path.abspath(download_directory) 确保 download_directory 是绝对路径
-            # full_path 也转换为绝对路径进行比较
-            abs_download_dir = os.path.abspath(download_directory)
-            abs_full_path = os.path.abspath(full_path)
+        """提供下载的文件"""
+        return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename)
 
-            if not abs_full_path.startswith(abs_download_dir + os.sep) and abs_full_path != abs_download_dir :
-                logger.error(f"检测到路径遍历尝试: {filename} -> {abs_full_path} vs {abs_download_dir}")
-                return jsonify({'error': '禁止访问的文件路径'}), 403
-            
-            if not os.path.isfile(abs_full_path): # 确保请求的是文件
-                logger.error(f"请求下载的路径不是文件: {safe_filename}")
-                return jsonify({'error': '请求的路径不是文件'}), 404
 
-            return send_from_directory(download_directory, safe_filename, as_attachment=True)
-        except FileNotFoundError:
-            logger.error(f"请求下载的文件未找到: {safe_filename} in {download_directory}")
-            return jsonify({'error': '文件未找到'}), 404
-        except Exception as e:
-            logger.error(f"下载文件时发生错误: {safe_filename}, {e}", exc_info=True)
-            # Return generic error message to user, log specific error
-            return jsonify({'error': '下载文件时发生服务器内部错误'}), 500
+def _build_ydl_options(data, download_folder):
+    """根据前端选项构建 yt-dlp 配置"""
 
-    def _build_ydl_options(data, download_folder_abs_path):
-        """根据前端选项构建 yt-dlp 配置，确保返回的字典是JSON可序列化的"""
-        ydl_opts = {
-            'outtmpl': os.path.join(download_folder_abs_path, '%(title).180B - %(id)s.%(ext)s'),
-            'quiet': False, 
-            'no_warnings': True, 
-            'restrictfilenames': True,
-            'writeinfojson': data.get('write_info_json', False),
-            'writesubtitles': data.get('download_subtitles', False),
-            'writeautomaticsub': data.get('auto_subtitles', False) if data.get('download_subtitles', False) else False,
-            'writethumbnail': data.get('download_thumbnail', False),
-            'max_filesize': data.get('max_filesize_gb', 5) * 1024 * 1024 * 1024,
-            'socket_timeout': int(data.get('socket_timeout', 60)),
-            'retries': int(data.get('retries', 5)),
-            'concurrent_fragment_downloads': int(data.get('concurrent_fragments', 7)),
-            'fragment_retries': int(data.get('fragment_retries', 5)),
-            'skip_unavailable_fragments': data.get('skip_unavailable_fragments', True),
-            'noprogress': True,
-            'postprocessor_args': {'ffmpeg': ['-hide_banner', '-loglevel', 'error', '-stats_period', '1']},
-            'ffmpeg_location': os.environ.get('FFMPEG_PATH', 'ffmpeg'),
-        }
-        audio_only = data.get('audio_only', False)
-        format_string = data.get('format_string', data.get('quality', 'bestvideo+bestaudio/best' if not audio_only else 'bestaudio/best'))
-        output_format_ext = data.get('output_format', 'auto').lower()
-        ydl_opts['format'] = format_string
-        ydl_opts.setdefault('postprocessors', [])
-        if audio_only:
-            if format_string.startswith('mp3_') and format_string.endswith('_convert'): 
-                quality_val = format_string.split('_')[1].replace('k', '')
-                ydl_opts['format'] = f'bestaudio[abr<={quality_val}]/bestaudio/best'
-                ydl_opts['postprocessors'].append({'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': quality_val if quality_val.isdigit() else '192'})
-            elif output_format_ext in ['mp3', 'm4a', 'aac', 'opus', 'vorbis', 'wav', 'flac'] and output_format_ext not in ['auto', 'best']:
-                preferred_audio_quality = data.get('audio_bitrate', '192K')
-                quality_for_ffmpeg = re.sub(r'[^0-9]', '', preferred_audio_quality) or '192'
-                ydl_opts['postprocessors'].append({'key': 'FFmpegExtractAudio', 'preferredcodec': output_format_ext, 'preferredquality': quality_for_ffmpeg})
-        else: 
-            if output_format_ext in ['mp4', 'mkv', 'webm', 'mov', 'avi'] and output_format_ext not in ['auto', 'best']:
-                if output_format_ext == 'mp4':
-                     ydl_opts['postprocessors'].append({'key': 'FFmpegVideoConvertor', 'preferedformat': 'mp4'})
-                else:
-                     ydl_opts['postprocessors'].append({'key': 'FFmpegVideoConvertor', 'preferedformat': output_format_ext})
-        
-        if data.get('download_subtitles', False):
-            sub_langs_input = data.get('subtitle_langs', 'all')
-            if isinstance(sub_langs_input, str) and sub_langs_input.lower() != 'all':
-                ydl_opts['subtitleslangs'] = [s.strip() for s in sub_langs_input.split(',')]
-            elif isinstance(sub_langs_input, list) and 'all' not in [s.lower() for s in sub_langs_input]:
-                ydl_opts['subtitleslangs'] = sub_langs_input
-            if data.get('embed_subtitles', False) and ydl_opts['writesubtitles']:
-                ydl_opts['postprocessors'].append({'key': 'FFmpegEmbedSubtitle'})
-        if data.get('download_thumbnail', False) and data.get('embed_thumbnail', False):
-            ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
-        if data.get('download_description', False): ydl_opts['writedescription'] = True
-        playlist_items_str = data.get('playlist_items')
-        if playlist_items_str:
-            ydl_opts['playlist_items'] = playlist_items_str
-            ydl_opts['noplaylist'] = False 
-        elif data.get('download_playlist', False):
-            ydl_opts['noplaylist'] = False
+    # 基础配置
+    ydl_opts = {
+        'outtmpl': os.path.join(download_folder, '%(title).200s.%(ext)s'),  # 限制标题长度
+        'quiet': True,
+        'no_warnings': True,
+        'restrictfilenames': True,  # 限制文件名字符
+        'writeinfojson': False,  # 默认不写入info json
+        'writesubtitles': False,  # 默认不下载字幕
+        'writeautomaticsub': False,  # 默认不下载自动字幕
+        'writethumbnail': False,  # 默认不下载缩略图
+        'max_filesize': 5 * 1024 * 1024 * 1024,  # 5GB 文件大小限制
+        'socket_timeout': 30,  # 30秒超时
+        'retries': 3,  # 重试3次
+    }
+
+    # 音频/视频选择
+    audio_only = data.get('audio_only', False)
+    video_quality = data.get('video_quality', 'best')
+    audio_quality = data.get('audio_quality', 'best')
+    output_format = data.get('output_format', 'best')
+
+    # 构建格式选择器
+    if audio_only:
+        if audio_quality == 'best':
+            ydl_opts['format'] = 'bestaudio/best'
+        elif audio_quality == 'worst':
+            ydl_opts['format'] = 'worstaudio/worst'
         else:
-            ydl_opts['noplaylist'] = True
-        if 'outtmpl_direct' in data and data['outtmpl_direct']: ydl_opts['outtmpl'] = data['outtmpl_direct']
-        elif 'outtmpl_override' in data and data['outtmpl_override']: ydl_opts['outtmpl'] = data['outtmpl_override']
-        
-        return _make_json_serializable_recursive(ydl_opts)
+            # 指定音频比特率
+            ydl_opts['format'] = f'bestaudio[abr<={audio_quality}]/bestaudio/best'
+    else:
+        # 视频下载 - 确保包含音频
+        if video_quality == 'best':
+            # 优先选择包含音频的最佳格式，如果没有则分别下载后合并
+            ydl_opts['format'] = 'best[vcodec!=none][acodec!=none]/bestvideo[height<=1080]+bestaudio/best'
+        elif video_quality == 'worst':
+            ydl_opts['format'] = 'worst[vcodec!=none][acodec!=none]/worstvideo+worstaudio/worst'
+        else:
+            # 指定视频分辨率，确保包含音频
+            ydl_opts['format'] = f'best[height<={video_quality}][vcodec!=none][acodec!=none]/bestvideo[height<={video_quality}]+bestaudio/best[height<={video_quality}]'
 
-    def _download_worker(download_id, url, ydl_opts_original):
-        current_ydl_opts = ydl_opts_original.copy()
-        actual_filename_downloaded = None 
-        try:
-            download_manager.update_download(download_id, status='downloading', start_time=datetime.now(timezone.utc).isoformat())
-            def progress_hook(d):
-                nonlocal actual_filename_downloaded
-                try:
-                    hook_status = d.get('status')
-                    if hook_status == 'downloading':
-                        update_data = {'status': 'downloading'}
-                        total_bytes_key = 'total_bytes' if d.get('total_bytes') else 'total_bytes_estimate'
-                        if d.get(total_bytes_key):
-                            downloaded, total = d.get('downloaded_bytes', 0), d[total_bytes_key]
-                            if total and total > 0: update_data['progress'] = round((downloaded / total) * 100, 2)
-                            update_data.update({'total_bytes': total, 'downloaded_bytes': downloaded})
-                        if d.get('speed'): update_data['speed'] = round(d['speed'] / (1024*1024), 2) if d['speed'] else None
-                        if d.get('eta') is not None: update_data['eta'] = int(d['eta'])
-                        if d.get('elapsed') is not None: update_data['elapsed'] = int(d['elapsed'])
-                        current_dl_filename = d.get('_filename') or d.get('filename') or d.get('info_dict', {}).get('_filename')
-                        if current_dl_filename: update_data['filename'] = os.path.basename(current_dl_filename)
-                        download_manager.update_download(download_id, **update_data)
-                    elif hook_status == 'finished':
-                        final_filename_from_hook = d.get('filename') or d.get('info_dict', {}).get('_filename')
-                        if final_filename_from_hook: actual_filename_downloaded = os.path.basename(final_filename_from_hook)
-                        logger.info(f"下载完成 (钩子): {download_id}, 文件: {actual_filename_downloaded or '未知'}")
-                        download_manager.update_download(download_id, status='completed', progress=100.0, filename=actual_filename_downloaded, end_time=datetime.now(timezone.utc).isoformat(), speed=0.0)
-                        cleanup_mgr = get_cleanup_manager()
-                        if cleanup_mgr and actual_filename_downloaded: cleanup_mgr.cleanup_on_download_complete(actual_filename_downloaded)
-                    elif hook_status == 'error':
-                        error_detail = d.get('error', d.get('fragment_error', '未知下载错误 (来自钩子)'))
-                        logger.error(f"下载过程中发生错误 (钩子报告): {download_id}, info: {error_detail}")
-                        download_manager.update_download(download_id, status='error', error=str(error_detail), end_time=datetime.now(timezone.utc).isoformat())
-                except Exception as e_hook_inner:
-                    logger.error(f"进度钩子内部错误: {download_id}, {e_hook_inner}", exc_info=True)
-            
-            current_ydl_opts['progress_hooks'] = [progress_hook]
-            current_ydl_opts['quiet'] = False 
-            current_ydl_opts['noprogress'] = True
+    # 输出格式转换
+    if output_format != 'best' and output_format != 'auto':
+        if output_format in ['mp3', 'aac', 'flac', 'wav']:
+            # 音频格式
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': output_format,
+                'preferredquality': audio_quality if audio_quality.isdigit() else '192',
+            }]
+        elif output_format in ['mp4', 'webm', 'mkv']:
+            # 视频格式
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': output_format,
+            }]
 
-            if current_ydl_opts.get('noplaylist', False) and 'playlist_items' in current_ydl_opts:
-                del current_ydl_opts['playlist_items']
+    # 字幕下载
+    if data.get('download_subtitles', False):
+        ydl_opts['writesubtitles'] = True
+        ydl_opts['writeautomaticsub'] = True
 
-            with YoutubeDL(current_ydl_opts) as ydl:
-                logger.info(f"工作线程 {download_id} 使用选项: {json.dumps(current_ydl_opts, indent=2, default=str)} 下载URL: {url}")
-                ydl.download([url]) 
-            
-            current_status_after_dl = download_manager.get_download(download_id)
-            if current_status_after_dl and current_status_after_dl.get('status') == 'downloading':
-                logger.warning(f"下载 {download_id} 在yt-dlp.download()结束后状态仍为 'downloading'。")
-                if actual_filename_downloaded and os.path.exists(os.path.join(current_app.config['DOWNLOAD_FOLDER'], actual_filename_downloaded)):
-                     download_manager.update_download(download_id, status='completed', progress=100.0, filename=actual_filename_downloaded, end_time=datetime.now(timezone.utc).isoformat())
-                     logger.info(f"下载 {download_id} 在工作线程末尾被标记为完成。")
-                     cleanup_mgr = get_cleanup_manager(); 
-                     if cleanup_mgr: cleanup_mgr.cleanup_on_download_complete(actual_filename_downloaded)
-                else:
-                    logger.error(f"下载 {download_id} 完成但未获取到最终文件名。标记为错误。")
-                    download_manager.update_download(download_id, status='error', error='下载后未找到有效文件名。', end_time=datetime.now(timezone.utc).isoformat())
-        except SystemExit as e_sysexit: 
-            logger.error(f"下载工作线程 {download_id} 遇到 SystemExit: {e_sysexit}", exc_info=True)
-            download_manager.update_download(download_id, status='error', error=f"下载器严重错误: {e_sysexit}", end_time=datetime.now(timezone.utc).isoformat())
-        except Exception as e_worker_main:
-            error_msg = str(e_worker_main.args[0]) if hasattr(e_worker_main, 'args') and e_worker_main.args else str(e_worker_main)
-            logger.error(f"下载工作线程 {download_id} 发生严重错误: {error_msg}", exc_info=True)
-            download_manager.update_download(download_id, status='error', error=error_msg, end_time=datetime.now(timezone.utc).isoformat())
+        subtitle_lang = data.get('subtitle_lang', 'all')
+        if subtitle_lang != 'all':
+            ydl_opts['subtitleslangs'] = [subtitle_lang]
 
-    def _get_current_version():
-        """获取当前yt-dlp库版本"""
-        try:
-            import yt_dlp.version 
-            return yt_dlp.version.__version__
-        except ImportError:
-            logger.warning("无法从 yt_dlp.version 导入 __version__")
-            try:
-                import subprocess
-                result = subprocess.run(['yt-dlp', '--version'], capture_output=True, text=True, check=True, timeout=5)
-                return result.stdout.strip()
-            except Exception as e_ver: 
-                logger.error(f"执行 yt-dlp --version 失败: {e_ver}", exc_info=True)
-                return "unknown"
+    # 缩略图下载
+    if data.get('download_thumbnail', False):
+        ydl_opts['writethumbnail'] = True
 
-    def _get_last_update_time():
-        """获取 yt-dlp 库文件的最后修改时间"""
-        try:
-            import yt_dlp 
-            lib_file_to_check = os.path.join(os.path.dirname(yt_dlp.__file__), '__init__.py')
-            if os.path.exists(lib_file_to_check):
-                mtime = os.path.getmtime(lib_file_to_check)
-                return datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
-            return "unknown (library path check failed)"
-        except Exception as e_lup: 
-            logger.error(f"获取yt-dlp最后更新时间失败: {e_lup}", exc_info=True)
-            return "unknown"
+    # 描述下载
+    if data.get('download_description', False):
+        ydl_opts['writedescription'] = True
+        ydl_opts['writeinfojson'] = True
 
-    def _generate_shortcut_config(shortcut_type): # 这个函数现在主要用于元数据，实际文件由 /api/shortcuts/download-file 提供
-        """为iOS快捷指令生成示例配置元数据"""
-        try:
-            if request and request.url_root:
-                server_base_url = request.url_root.rstrip('/') 
-            else:
-                server_base_url = os.environ.get('SERVER_URL_FOR_SHORTCUTS', f"http://{os.environ.get('HOST', 'localhost')}:{os.environ.get('PORT', '8080')}")
-        except RuntimeError: 
-            server_base_url = os.environ.get('SERVER_URL_FOR_SHORTCUTS', f"http://{os.environ.get('HOST', 'localhost')}:{os.environ.get('PORT', '8080')}") 
+    # 播放列表处理
+    if data.get('download_playlist', False):
+        ydl_opts['noplaylist'] = False
+    else:
+        ydl_opts['noplaylist'] = True
 
-        hostname = urlparse(server_base_url).hostname or "your_server"
-        # 这个函数现在返回的是元数据，实际的 .shortcut 文件应预先创建并放在 static/shortcuts/
-        shortcuts_meta = {
-            'smart_downloader': {
-                "name": f"智能下载器@{hostname}", 
-                "description": "从剪贴板获取链接, 选择格式后通过yt-dlp-web下载。",
-                "filename": "SmartVideoDownloader.shortcut", # 指向 static/shortcuts/ 下的实际文件
-                "api_endpoint_async": f"{server_base_url}/api/shortcuts/download", # 异步下载API
-                "api_endpoint_direct": f"{server_base_url}/api/shortcuts/download-direct", # 直接下载API
-                "status_url_pattern": f"{server_base_url}/api/download/{{DOWNLOAD_ID}}/status",
-                "file_url_pattern": f"{server_base_url}/api/shortcuts/download/{{DOWNLOAD_ID}}/file"
-            },
-            'audio_extractor': {
-                "name": f"音频提取@{hostname}", 
-                "description": "从剪贴板获取链接, 提取MP3音频。",
-                "filename": "AudioExtractor.shortcut",
-                "api_endpoint_direct": f"{server_base_url}/api/shortcuts/download-direct", 
-                "default_params": {"audio_only": "true", "output_format": "mp3", "format_string": "bestaudio/best"}
-            },
-            '720p_downloader': {
-                "name": f"720P下载器@{hostname}",
-                "description": "从剪贴板获取链接, 下载720P MP4视频。",
-                "filename": "720PDownloader.shortcut",
-                "api_endpoint_direct": f"{server_base_url}/api/shortcuts/download-direct",
-                "default_params": {"audio_only": "false", "format_string": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]", "output_format": "mp4"}
-            }
+    return ydl_opts
+
+
+def _get_current_version():
+    """获取当前yt-dlp版本"""
+    try:
+        from ..version import __version__
+        return __version__
+    except ImportError:
+        return "unknown"
+
+
+def _get_last_update_time():
+    """获取最后更新时间"""
+    try:
+        import os
+        import time
+
+        # 检查version.py文件的修改时间
+        version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'version.py')
+        if os.path.exists(version_file):
+            mtime = os.path.getmtime(version_file)
+            return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mtime))
+        return "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _generate_shortcut_config(shortcut_type):
+    """生成iOS快捷指令配置"""
+
+    # 获取当前服务器地址（这里使用占位符，前端会替换）
+    server_url = "http://YOUR_SERVER_IP:8080"
+
+    shortcuts = {
+        'smart_downloader': {
+            'name': '智能视频下载器',
+            'description': '支持格式选择的交互式下载器',
+            'actions': [
+                {
+                    'type': 'get_clipboard',
+                    'description': '获取剪贴板中的视频链接'
+                },
+                {
+                    'type': 'choose_from_menu',
+                    'prompt': '选择下载格式',
+                    'options': [
+                        '🎬 最佳质量视频',
+                        '📱 720P视频',
+                        '💾 480P视频',
+                        '🎵 高品质MP3',
+                        '🎶 标准MP3'
+                    ]
+                },
+                {
+                    'type': 'text_replace_multiple',
+                    'replacements': [
+                        {'find': '🎬 最佳质量视频', 'replace': 'video_best'},
+                        {'find': '📱 720P视频', 'replace': 'video_720'},
+                        {'find': '💾 480P视频', 'replace': 'video_480'},
+                        {'find': '🎵 高品质MP3', 'replace': 'audio_320'},
+                        {'find': '🎶 标准MP3', 'replace': 'audio_192'}
+                    ]
+                },
+                {
+                    'type': 'conditional_download',
+                    'video_url': f'{server_url}/api/shortcuts/download-direct',
+                    'audio_url': f'{server_url}/api/shortcuts/download-direct'
+                }
+            ]
+        },
+        'audio_extractor': {
+            'name': '音频提取器',
+            'description': '一键提取视频音频为MP3',
+            'actions': [
+                {
+                    'type': 'get_clipboard'
+                },
+                {
+                    'type': 'download_audio',
+                    'url': f'{server_url}/api/shortcuts/download-direct',
+                    'params': {
+                        'audio_only': 'true',
+                        'audio_quality': '320',
+                        'output_format': 'mp3'
+                    }
+                }
+            ]
+        },
+        '720p_downloader': {
+            'name': '720P下载器',
+            'description': '专门下载720P高清视频',
+            'actions': [
+                {
+                    'type': 'get_clipboard'
+                },
+                {
+                    'type': 'download_video',
+                    'url': f'{server_url}/api/shortcuts/download-direct',
+                    'params': {
+                        'audio_only': 'false',
+                        'video_quality': 'best[height<=720]',
+                        'output_format': 'mp4'
+                    }
+                }
+            ]
+        },
+        'batch_downloader': {
+            'name': '批量下载器',
+            'description': '支持多个视频批量下载',
+            'actions': [
+                {
+                    'type': 'ask_for_input',
+                    'prompt': '请输入视频链接（每行一个）',
+                    'input_type': 'text'
+                },
+                {
+                    'type': 'split_text',
+                    'separator': '\\n'
+                },
+                {
+                    'type': 'repeat_for_each',
+                    'download_url': f'{server_url}/api/shortcuts/download-direct'
+                }
+            ]
         }
-        return shortcuts_meta.get(shortcut_type)
+    }
 
-    return app
+    return shortcuts.get(shortcut_type)
+
+
+def _download_worker(download_id, url, ydl_opts):
+    """用于下载视频的后台工作线程"""
+    try:
+        download_manager.update_download(download_id, status='downloading')
+
+        # 添加进度钩子
+        def progress_hook(d):
+            if d['status'] == 'downloading':
+                # 更新进度信息
+                update_data = {}
+
+                if 'total_bytes' in d and d['total_bytes']:
+                    progress = (d['downloaded_bytes'] / d['total_bytes']) * 100
+                    update_data['progress'] = progress
+                    update_data['total_bytes'] = d['total_bytes']
+                elif 'total_bytes_estimate' in d and d['total_bytes_estimate']:
+                    progress = (d['downloaded_bytes'] / d['total_bytes_estimate']) * 100
+                    update_data['progress'] = progress
+                    update_data['total_bytes'] = d['total_bytes_estimate']
+
+                if 'speed' in d and d['speed']:
+                    update_data['speed'] = d['speed']
+
+                if 'eta' in d and d['eta']:
+                    update_data['eta'] = d['eta']
+
+                download_manager.update_download(download_id, **update_data)
+
+            elif d['status'] == 'finished':
+                filename = os.path.basename(d['filename'])
+                download_manager.update_download(
+                    download_id,
+                    status='completed',
+                    progress=100,
+                    filename=filename
+                )
+
+                # 下载完成后触发清理
+                cleanup_mgr = get_cleanup_manager()
+                if cleanup_mgr:
+                    cleanup_mgr.cleanup_on_download_complete(filename)
+
+        ydl_opts['progress_hooks'] = [progress_hook]
+
+        with YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+
+    except Exception as e:
+        download_manager.update_download(
+            download_id,
+            status='error',
+            error=str(e)
+        )

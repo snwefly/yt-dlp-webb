@@ -73,11 +73,10 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 
 # 复制应用代码
-COPY web /app/web  # Corrected path
+COPY web /app/web
 COPY start.sh /app/
 
 # 创建必要目录并设置权限
-# Removed problematic yt_dlp directory creation here
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
     && chmod +x /app/start.sh \

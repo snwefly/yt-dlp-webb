@@ -1091,49 +1091,14 @@
             const duration = info.duration ? formatDuration(info.duration) : '未知';
             const fileSize = info.filesize ? formatFileSize(info.filesize) : '未知';
 
-            // 使用 textContent 来防止 XSS
-            videoInfoDiv.innerHTML = ''; // Clear previous content
-
-            const titleEl = document.createElement('h3');
-            titleEl.textContent = info.title || '未知标题';
-            videoInfoDiv.appendChild(titleEl);
-
-            const uploaderP = document.createElement('p');
-            const uploaderStrong = document.createElement('strong');
-            uploaderStrong.textContent = '上传者：';
-            uploaderP.appendChild(uploaderStrong);
-            uploaderP.appendChild(document.createTextNode(info.uploader || '未知'));
-            videoInfoDiv.appendChild(uploaderP);
-
-            const durationP = document.createElement('p');
-            const durationStrong = document.createElement('strong');
-            durationStrong.textContent = '时长：';
-            durationP.appendChild(durationStrong);
-            durationP.appendChild(document.createTextNode(duration));
-            videoInfoDiv.appendChild(durationP);
-
-            const viewCountP = document.createElement('p');
-            const viewCountStrong = document.createElement('strong');
-            viewCountStrong.textContent = '观看次数：';
-            viewCountP.appendChild(viewCountStrong);
-            viewCountP.appendChild(document.createTextNode(info.view_count ? info.view_count.toLocaleString() : '未知'));
-            videoInfoDiv.appendChild(viewCountP);
-
-            const fileSizeP = document.createElement('p');
-            const fileSizeStrong = document.createElement('strong');
-            fileSizeStrong.textContent = '预估大小：';
-            fileSizeP.appendChild(fileSizeStrong);
-            fileSizeP.appendChild(document.createTextNode(fileSize));
-            videoInfoDiv.appendChild(fileSizeP);
-
-            if (info.description) {
-                const descriptionP = document.createElement('p');
-                const descriptionStrong = document.createElement('strong');
-                descriptionStrong.textContent = '描述：';
-                descriptionP.appendChild(descriptionStrong);
-                descriptionP.appendChild(document.createTextNode(info.description.substring(0, 200) + '...'));
-                videoInfoDiv.appendChild(descriptionP);
-            }
+            videoInfoDiv.innerHTML = `
+                <h3>${info.title || '未知标题'}</h3>
+                <p><strong>上传者：</strong> ${info.uploader || '未知'}</p>
+                <p><strong>时长：</strong> ${duration}</p>
+                <p><strong>观看次数：</strong> ${info.view_count ? info.view_count.toLocaleString() : '未知'}</p>
+                <p><strong>预估大小：</strong> ${fileSize}</p>
+                ${info.description ? `<p><strong>描述：</strong> ${info.description.substring(0, 200)}...</p>` : ''}
+            `;
         }
 
         // 开始下载
@@ -1232,43 +1197,12 @@
                 'error': '错误'
             };
 
-            statusDiv.innerHTML = ''; // Clear previous content
-
-            const statusP = document.createElement('p');
-            const statusStrong = document.createElement('strong');
-            statusStrong.textContent = '状态：';
-            statusP.appendChild(statusStrong);
-            statusP.appendChild(document.createTextNode(statusMap[download.status] || download.status));
-            statusDiv.appendChild(statusP);
-
-            const urlP = document.createElement('p');
-            const urlStrong = document.createElement('strong');
-            urlStrong.textContent = '链接：';
-            urlP.appendChild(urlStrong);
-            urlP.appendChild(document.createTextNode(download.url));
-            statusDiv.appendChild(urlP);
-
-            if (download.filename) {
-                const fileP = document.createElement('p');
-                const fileStrong = document.createElement('strong');
-                fileStrong.textContent = '文件：';
-                fileP.appendChild(fileStrong);
-                const fileLink = document.createElement('a');
-                fileLink.href = `/downloads/${download.filename}`;
-                fileLink.target = '_blank';
-                fileLink.textContent = download.filename;
-                fileP.appendChild(fileLink);
-                statusDiv.appendChild(fileP);
-            }
-
-            if (download.error) {
-                const errorP = document.createElement('p');
-                const errorStrong = document.createElement('strong');
-                errorStrong.textContent = '错误：';
-                errorP.appendChild(errorStrong);
-                errorP.appendChild(document.createTextNode(download.error)); // Error messages are treated as text
-                statusDiv.appendChild(errorP);
-            }
+            statusDiv.innerHTML = `
+                <p><strong>状态：</strong> ${statusMap[download.status] || download.status}</p>
+                <p><strong>链接：</strong> ${download.url}</p>
+                ${download.filename ? `<p><strong>文件：</strong> <a href="/downloads/${download.filename}" target="_blank">${download.filename}</a></p>` : ''}
+                ${download.error ? `<p><strong>错误：</strong> ${download.error}</p>` : ''}
+            `;
 
             if (download.status === 'downloading' && download.progress > 0) {
                 progressContainer.classList.remove('hidden');
@@ -1338,51 +1272,17 @@
                 const statusClass = download.status === 'completed' ? 'completed' :
                                   download.status === 'error' ? 'error' : '';
 
-                const itemDiv = document.createElement('div');
-                itemDiv.className = `download-item ${statusClass}`;
+                return `
+                    <div class="download-item ${statusClass}">
+                        <p><strong>状态：</strong> ${statusMap[download.status] || download.status}</p>
+                        <p><strong>链接：</strong> <span style="word-break: break-all;">${download.url}</span></p>
+                        ${download.filename ? `<p><strong>文件：</strong> <a href="/downloads/${download.filename}" target="_blank">${download.filename}</a></p>` : ''}
+                        <p><strong>开始时间：</strong> ${new Date(download.created_at).toLocaleString()}</p>
+                    </div>
+                `;
+            }).join('');
 
-                const statusP = document.createElement('p');
-                const statusStrong = document.createElement('strong');
-                statusStrong.textContent = '状态：';
-                statusP.appendChild(statusStrong);
-                statusP.appendChild(document.createTextNode(statusMap[download.status] || download.status));
-                itemDiv.appendChild(statusP);
-
-                const urlP = document.createElement('p');
-                const urlStrong = document.createElement('strong');
-                urlStrong.textContent = '链接：';
-                urlP.appendChild(urlStrong);
-                const urlSpan = document.createElement('span');
-                urlSpan.style.wordBreak = 'break-all';
-                urlSpan.textContent = download.url;
-                urlP.appendChild(urlSpan);
-                itemDiv.appendChild(urlP);
-
-                if (download.filename) {
-                    const fileP = document.createElement('p');
-                    const fileStrong = document.createElement('strong');
-                    fileStrong.textContent = '文件：';
-                    fileP.appendChild(fileStrong);
-                    const fileLink = document.createElement('a');
-                    fileLink.href = `/downloads/${download.filename}`;
-                    fileLink.target = '_blank';
-                    fileLink.textContent = download.filename;
-                    fileP.appendChild(fileLink);
-                    itemDiv.appendChild(fileP);
-                }
-
-                const timeP = document.createElement('p');
-                const timeStrong = document.createElement('strong');
-                timeStrong.textContent = '开始时间：';
-                timeP.appendChild(timeStrong);
-                timeP.appendChild(document.createTextNode(new Date(download.created_at).toLocaleString()));
-                itemDiv.appendChild(timeP);
-                
-                return itemDiv;
-            });
-
-            downloadsDiv.innerHTML = ''; // Clear previous items
-            downloadItems.forEach(itemElement => downloadsDiv.appendChild(itemElement));
+            downloadsDiv.innerHTML = downloadItems;
         }
 
         // 工具函数
