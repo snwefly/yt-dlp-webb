@@ -1053,16 +1053,8 @@ def _real_main(argv=None):
 
         if opts.web_server:
             try:
-                from web.server import WebServer
-                server = WebServer(
-                    host=opts.web_host,
-                    port=opts.web_port,
-                    download_folder=opts.web_download_folder
-                )
-                server.start(open_browser=not opts.web_no_browser)
-                return 0
-            except ImportError:
-                ydl.report_error('Web server dependencies not installed. Install with: pip install yt-dlp[web]')
+                # 使用我们的 webapp 而不是原始的 web 模块
+                ydl.report_error('Web server feature has been replaced with a custom webapp. Use the Docker container or run webapp/server.py directly.')
                 return 1
             except Exception as e:
                 ydl.report_error(f'Failed to start web server: {e}')
