@@ -1053,7 +1053,7 @@ def _real_main(argv=None):
 
         if opts.web_server:
             try:
-                from .web.server import WebServer
+                from web.server import WebServer
                 server = WebServer(
                     host=opts.web_host,
                     port=opts.web_port,
