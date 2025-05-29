@@ -49,8 +49,9 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装yt-dlp（最新版本）
-RUN pip install --no-cache-dir --upgrade yt-dlp
+# 安装yt-dlp（最新版本）并验证安装
+RUN pip install --no-cache-dir --upgrade yt-dlp && \
+    python3 -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
 
 # 复制Web应用代码和启动脚本
 COPY yt_dlp /app/yt_dlp
@@ -63,8 +64,7 @@ RUN dos2unix /app/start.sh && \
 
 # 创建必要的Python包结构
 RUN mkdir -p /app/yt_dlp && \
-    touch /app/yt_dlp/__init__.py && \
-    python3 -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
+    touch /app/yt_dlp/__init__.py
 
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
