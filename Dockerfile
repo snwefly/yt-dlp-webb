@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.description="带下载管理的yt-dlp网页界面
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.created="${BUILDTIME}"
 LABEL org.opencontainers.image.revision="${REVISION}"
-LABEL org.opencontainers.image.source="https://github.com/zhumao520/yt-dlp-web" # 请确认是否仍是这个源
+LABEL org.opencontainers.image.source="https://github.com/zhumao520/yt-dlp-web"
 LABEL org.opencontainers.image.licenses="Unlicense"
 
 WORKDIR /app
