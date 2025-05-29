@@ -7,12 +7,12 @@ ARG VERSION
 ARG REVISION
 
 # 添加标签
-LABEL org.opencontainers.image.title="YT-DLP Web Interface"
-LABEL org.opencontainers.image.description="Web interface for yt-dlp with download management"
+LABEL org.opencontainers.image.title="YT-DLP 网页界面"
+LABEL org.opencontainers.image.description="带下载管理的yt-dlp网页界面"
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.created="${BUILDTIME}"
 LABEL org.opencontainers.image.revision="${REVISION}"
-LABEL org.opencontainers.image.source="https://github.com/your-username/yt-dlp-web-deploy"
+LABEL org.opencontainers.image.source="https://github.com/zhumao520/yt-dlp-web"
 LABEL org.opencontainers.image.licenses="Unlicense"
 
 # 设置工作目录
@@ -24,6 +24,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV VERSION=${VERSION}
 ENV REVISION=${REVISION}
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/app
 
 # 创建非root用户（提前创建以提高安全性）
 RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
@@ -51,11 +52,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir --upgrade yt-dlp
 
 # 复制Web应用代码
-COPY yt_dlp/web /app/yt_dlp/web
+COPY yt_dlp /app/yt_dlp
 COPY start.sh /app/
 
-# 创建yt_dlp包的__init__.py
-RUN mkdir -p /app/yt_dlp && echo "# yt-dlp web interface" > /app/yt_dlp/__init__.py
+# 创建必要的Python包结构
+RUN mkdir -p /app/yt_dlp && \
+    touch /app/yt_dlp/__init__.py && \
+    python3 -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
 
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
