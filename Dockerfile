@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     ca-certificates \
+    dos2unix \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
@@ -51,9 +52,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 安装yt-dlp（最新版本）
 RUN pip install --no-cache-dir --upgrade yt-dlp
 
-# 复制Web应用代码
+# 复制Web应用代码和启动脚本
 COPY yt_dlp /app/yt_dlp
 COPY start.sh /app/
+
+# 确保启动脚本使用正确的行尾符号并设置执行权限
+RUN dos2unix /app/start.sh && \
+    chmod +x /app/start.sh && \
+    chown ytdlp:ytdlp /app/start.sh
 
 # 创建必要的Python包结构
 RUN mkdir -p /app/yt_dlp && \
@@ -62,7 +68,6 @@ RUN mkdir -p /app/yt_dlp && \
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
-    && chmod +x /app/start.sh \
     && chmod 755 /app/downloads /app/config /app/logs
 
 # 切换到非root用户
