@@ -49,42 +49,26 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装yt-dlp（最新版本）并验证安装
-RUN echo "开始安装 yt-dlp..." && \
-    pip install --no-cache-dir --upgrade yt-dlp && \
-    echo "yt-dlp 安装完成，验证安装..." && \
-    python3 -c "import sys; print('Python 路径:', sys.path)" && \
-    python3 -c "import yt_dlp; print('yt-dlp 版本:', yt_dlp.version.__version__); print('yt-dlp 位置:', yt_dlp.__file__)" && \
-    echo "验证完成"
-
-# 复制Web应用代码和启动脚本
+# 复制项目文件
 COPY web /app/web
+COPY yt_dlp /app/yt_dlp
 COPY start.sh /app/
+
+# 验证项目结构
+RUN echo "验证项目结构..." && \
+    ls -la /app/ && \
+    ls -la /app/web/ && \
+    ls -la /app/yt_dlp/ && \
+    echo "项目结构验证完成"
 
 # 确保启动脚本使用正确的行尾符号并设置执行权限
 RUN dos2unix /app/start.sh && \
-    chmod +x /app/start.sh && \
-    chown ytdlp:ytdlp /app/start.sh
-
-# 创建必要的Python包结构
-RUN echo "创建 Python 包结构..." && \
-    mkdir -p /app/yt_dlp && \
-    touch /app/yt_dlp/__init__.py && \
-    echo "包结构创建完成"
+    chmod +x /app/start.sh
 
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
     && chmod 755 /app/downloads /app/config /app/logs
-
-# 创建软链接以确保模块可以被正确导入
-RUN echo "创建软链接..." && \
-    ln -sf /usr/local/lib/python3.11/site-packages/yt_dlp/cookies.py /app/yt_dlp/cookies.py && \
-    ln -sf /usr/local/lib/python3.11/site-packages/yt_dlp/version.py /app/yt_dlp/version.py && \
-    echo "软链接创建完成" && \
-    echo "验证软链接..." && \
-    ls -l /app/yt_dlp/cookies.py /app/yt_dlp/version.py && \
-    echo "软链接验证完成"
 
 # 切换到非root用户
 USER ytdlp

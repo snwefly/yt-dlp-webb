@@ -16,12 +16,12 @@ mkdir -p /app/config
 # 设置Python路径
 export PYTHONPATH="/app:$PYTHONPATH"
 
-# 验证yt-dlp安装
-echo "🔍 检查yt-dlp安装..."
-if command -v yt-dlp &> /dev/null; then
-    echo "✅ yt-dlp已安装: $(yt-dlp --version)"
+# 验证yt-dlp模块
+echo "🔍 检查yt-dlp模块..."
+if python3 -c "import yt_dlp; print('✅ yt-dlp模块可用')" 2>/dev/null; then
+    echo "✅ yt-dlp模块验证成功"
 else
-    echo "❌ yt-dlp未安装"
+    echo "❌ yt-dlp模块不可用"
     exit 1
 fi
 
