@@ -373,14 +373,37 @@ def register_routes(app):
             logger.error(f"Download start error: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
+# --- 这是被修改的函数 ---
     @app.route('/api/download/<download_id>/status')
+    @login_required # 如果你的版本有这一行，请保留
     def get_download_status(download_id):
         """获取下载状态"""
-        download = download_manager.get_download(download_id)
-        if not download:
+        download_info = download_manager.get_download(download_id) 
+
+        if not download_info:
             return jsonify({'error': '未找到下载'}), 404
 
-        return jsonify(download)
+        # 创建一个可序列化的副本，并将 set 转换为 list
+        serializable_download_info = {}
+        for key, value in download_info.items():
+            if isinstance(value, set):
+                serializable_download_info[key] = list(value)
+            elif isinstance(value, dict):
+                inner_dict_serializable = {}
+                for inner_key, inner_value in value.items():
+                    if isinstance(inner_value, set):
+                        inner_dict_serializable[inner_key] = list(inner_value)
+                    elif isinstance(inner_value, list): # 检查列表内的 set
+                        inner_dict_serializable[inner_key] = [list(item) if isinstance(item, set) else item for item in inner_value]
+                    else:
+                        inner_dict_serializable[inner_key] = inner_value
+                serializable_download_info[key] = inner_dict_serializable
+            elif isinstance(value, list):
+                serializable_download_info[key] = [list(item) if isinstance(item, set) else item for item in value]
+            else:
+                serializable_download_info[key] = value
+        
+        return jsonify(serializable_download_info)
 
     @app.route('/api/downloads')
     def list_downloads():
