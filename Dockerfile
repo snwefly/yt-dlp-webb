@@ -20,7 +20,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV VERSION=${VERSION}
 ENV REVISION=${REVISION}
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONPATH=/app # /app 将包含你的 web 目录
+ENV PYTHONPATH=/app
 
 RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
 
@@ -45,11 +45,11 @@ RUN pip install --no-cache-dir --upgrade yt-dlp && \
 
 # 复制你的 Web 应用代码 (即根目录下的 web 文件夹)
 COPY web /app/web/
-COPY start.sh /app/start.sh # 确保 start.sh 也被复制
+COPY start.sh /app/start.sh
 
 RUN dos2unix /app/start.sh && \
     chmod +x /app/start.sh && \
-    chown -R ytdlp:ytdlp /app # 整个 /app 目录及其内容
+    chown -R ytdlp:ytdlp /app
 
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown ytdlp:ytdlp /app/downloads /app/config /app/logs \
@@ -59,4 +59,4 @@ USER ytdlp
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/ || exit 1
-CMD ["/app/start.sh"] # start.sh 内部已修改为使用 web.server
+CMD ["/app/start.sh"]
