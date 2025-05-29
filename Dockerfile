@@ -63,7 +63,8 @@ RUN dos2unix /app/start.sh && \
 
 # 创建必要的Python包结构
 RUN mkdir -p /app/yt_dlp && \
-    touch /app/yt_dlp/__init__.py
+    touch /app/yt_dlp/__init__.py && \
+    python3 -c "import yt_dlp; print('yt-dlp version:', yt_dlp.version.__version__)"
 
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
