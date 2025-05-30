@@ -185,25 +185,40 @@ def create_app(config=None):
     except Exception as e:
         logger.warning(f"无法创建下载目录: {e}")
 
-    # 尝试修复权限问题（仅在有权限时）
+    # 验证下载目录权限
     try:
-        # 检查目录是否存在且可写
-        if os.path.exists(download_folder) and os.access(download_folder, os.W_OK):
-            # 只有在当前用户有权限时才尝试设置权限
-            current_stat = os.stat(download_folder)
-            if os.getuid() == 0 or os.getuid() == current_stat.st_uid:
-                os.chmod(download_folder, 0o775)
-                logger.info(f"下载目录权限已设置: {download_folder}")
-            else:
-                logger.info(f"下载目录已存在且可写: {download_folder}")
-        else:
-            logger.warning(f"下载目录不存在或不可写: {download_folder}")
-    except (OSError, AttributeError) as e:
-        # OSError: 权限问题
-        # AttributeError: Windows 系统可能没有 os.getuid()
-        logger.info(f"跳过权限设置（可能在Windows或受限环境中）: {e}")
+        # 测试写入权限
+        test_file = os.path.join(download_folder, '.write_test')
+        try:
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            logger.info(f"下载目录权限验证成功: {download_folder}")
+        except Exception as e:
+            logger.warning(f"下载目录写入权限测试失败: {e}")
+            logger.info(f"目录状态: 存在={os.path.exists(download_folder)}, 可读={os.access(download_folder, os.R_OK)}, 可写={os.access(download_folder, os.W_OK)}")
+
+            # 尝试修复权限（仅在有权限时）
+            try:
+                if hasattr(os, 'getuid'):  # Unix-like 系统
+                    current_stat = os.stat(download_folder)
+                    if os.getuid() == 0 or os.getuid() == current_stat.st_uid:
+                        os.chmod(download_folder, 0o755)
+                        logger.info(f"已尝试修复下载目录权限: {download_folder}")
+                    else:
+                        logger.info(f"无权限修改目录权限，当前用户: {os.getuid()}, 目录所有者: {current_stat.st_uid}")
+                else:
+                    logger.info("Windows系统，跳过权限修复")
+            except Exception as perm_e:
+                logger.warning(f"权限修复失败: {perm_e}")
+
     except Exception as e:
-        logger.warning(f"无法设置下载目录权限: {e}")
+        logger.warning(f"下载目录验证失败: {e}")
+        logger.info(f"当前工作目录: {os.getcwd()}")
+        if hasattr(os, 'getuid'):
+            logger.info(f"用户ID: {os.getuid()}, 组ID: {os.getgid()}")
+        else:
+            logger.info("Windows系统，无用户ID信息")
 
     # 初始化文件清理管理器
     cleanup_config = {
