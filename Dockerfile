@@ -81,9 +81,11 @@ RUN dos2unix /app/start.sh && \
     echo "start.sh 权限设置完成" && \
     ls -la /app/start.sh
 
-# 创建必要目录并设置正确权限
+# 切换到非root用户
+USER ytdlp
+
+# 创建必要目录并设置正确权限（以 ytdlp 用户身份）
 RUN mkdir -p /app/downloads /app/config /app/logs \
-    && chown -R ytdlp:ytdlp /app \
     && chmod 755 /app/downloads /app/config /app/logs \
     && echo "=== 验证目录权限 ===" \
     && ls -la /app/ \
@@ -115,9 +117,6 @@ except Exception as e: \
     print('⚠️ 继续构建，运行时将重新尝试'); \
 print('✅ 构建时模块测试完成'); \
 " || echo "⚠️ 模块测试完成（非阻塞）"
-
-# 切换到非root用户
-USER ytdlp
 
 # 验证用户权限和目录访问
 RUN echo "=== 验证用户权限 ===" && \
