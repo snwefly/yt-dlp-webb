@@ -48,13 +48,13 @@ chmod 777 /app/config 2>/dev/null || echo "⚠️ chmod /app/config 失败"
 chmod 777 /app/logs 2>/dev/null || echo "⚠️ chmod /app/logs 失败"
 chmod 777 /app/yt-dlp-cache 2>/dev/null || echo "⚠️ chmod /app/yt-dlp-cache 失败"
 
-# 如果是 root 用户，尝试 chown
+# 以 root 用户运行，确保目录权限正确
 if [ "$(id -u)" = "0" ]; then
-    echo "🔧 以 root 身份修复所有权..."
-    chown -R ytdlp:ytdlp $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ chown 下载目录失败"
-    chown -R ytdlp:ytdlp /app/config 2>/dev/null || echo "⚠️ chown config 失败"
-    chown -R ytdlp:ytdlp /app/logs 2>/dev/null || echo "⚠️ chown logs 失败"
-    chown -R ytdlp:ytdlp /app/yt-dlp-cache 2>/dev/null || echo "⚠️ chown cache 失败"
+    echo "🔧 以 root 身份确保目录权限..."
+    # 现在以 root 用户运行，不需要 chown 到 ytdlp
+    echo "✅ 以 root 用户运行，拥有完全权限"
+else
+    echo "⚠️ 非 root 用户运行，可能遇到权限问题"
 fi
 
 # 测试目录写入权限

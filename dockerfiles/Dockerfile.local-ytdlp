@@ -78,7 +78,8 @@ RUN dos2unix /app/start.sh && \
     echo "✅ 本地模式配置完成"
 
 # 切换到非root用户
-USER ytdlp
+# 使用 root 用户运行（注释掉 USER 指令）
+# USER ytdlp
 
 # 暴露端口
 EXPOSE 8080
