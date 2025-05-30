@@ -54,12 +54,31 @@ class DownloadManager:
     def get_download(self, download_id):
         """获取下载状态"""
         with self.lock:
-            return self.downloads.get(download_id)
+            download = self.downloads.get(download_id)
+            if download:
+                # 确保所有数据都是 JSON 可序列化的
+                return self._make_json_serializable(download.copy())
+            return download
+
+    def _make_json_serializable(self, obj):
+        """确保对象是 JSON 可序列化的"""
+        if isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._make_json_serializable(item) for item in obj]
+        elif isinstance(obj, set):
+            return list(obj)  # 将 set 转换为 list
+        elif hasattr(obj, '__dict__'):
+            return str(obj)  # 将复杂对象转换为字符串
+        else:
+            return obj
 
     def get_all_downloads(self):
         """获取所有下载"""
         with self.lock:
-            return list(self.downloads.values())
+            downloads = list(self.downloads.values())
+            # 确保所有数据都是 JSON 可序列化的
+            return [self._make_json_serializable(download.copy()) for download in downloads]
 
 
 # 全局下载管理器实例
@@ -295,33 +314,77 @@ def register_routes(app):
                 'skip_download': True,
             }
 
-            with YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+            # 合并增强配置
+            enhanced_opts = _get_enhanced_ydl_options()
+            ydl_opts.update(enhanced_opts)
 
-                # 返回相关信息
-                result = {
-                    'title': info.get('title'),
-                    'description': info.get('description'),
-                    'duration': info.get('duration'),
-                    'uploader': info.get('uploader'),
-                    'upload_date': info.get('upload_date'),
-                    'view_count': info.get('view_count'),
-                    'thumbnail': info.get('thumbnail'),
-                    'formats': []
-                }
+            # 尝试多种策略获取视频信息
+            info = None
+            last_error = None
 
-                # 添加格式信息
-                if 'formats' in info:
-                    for fmt in info['formats']:
-                        result['formats'].append({
-                            'format_id': fmt.get('format_id'),
-                            'ext': fmt.get('ext'),
-                            'quality': fmt.get('quality'),
-                            'filesize': fmt.get('filesize'),
-                            'format_note': fmt.get('format_note'),
-                        })
+            # 策略1: 使用 Android 客户端
+            try:
+                with YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+            except Exception as e:
+                last_error = e
+                app.logger.warning(f"Android 客户端失败: {str(e)}")
 
-                return jsonify(result)
+                # 策略2: 使用 Web 客户端
+                try:
+                    fallback_opts = ydl_opts.copy()
+                    fallback_opts['extractor_args'] = {
+                        'youtube': {
+                            'player_client': ['web'],
+                        }
+                    }
+                    with YoutubeDL(fallback_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                except Exception as e2:
+                    last_error = e2
+                    app.logger.warning(f"Web 客户端失败: {str(e2)}")
+
+                    # 策略3: 最基础配置
+                    try:
+                        basic_opts = {
+                            'quiet': True,
+                            'no_warnings': True,
+                            'extract_flat': False,
+                            'skip_download': True,
+                        }
+                        with YoutubeDL(basic_opts) as ydl:
+                            info = ydl.extract_info(url, download=False)
+                    except Exception as e3:
+                        last_error = e3
+                        app.logger.error(f"所有策略都失败: {str(e3)}")
+
+            if not info:
+                raise last_error or Exception("无法获取视频信息")
+
+            # 返回相关信息
+            result = {
+                'title': info.get('title'),
+                'description': info.get('description'),
+                'duration': info.get('duration'),
+                'uploader': info.get('uploader'),
+                'upload_date': info.get('upload_date'),
+                'view_count': info.get('view_count'),
+                'thumbnail': info.get('thumbnail'),
+                'formats': []
+            }
+
+            # 添加格式信息
+            if 'formats' in info:
+                for fmt in info['formats']:
+                    result['formats'].append({
+                        'format_id': fmt.get('format_id'),
+                        'ext': fmt.get('ext'),
+                        'quality': fmt.get('quality'),
+                        'filesize': fmt.get('filesize'),
+                        'format_note': fmt.get('format_note'),
+                    })
+
+            return jsonify(result)
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
@@ -416,6 +479,10 @@ def register_routes(app):
                 'no_warnings': True,
             }
 
+            # 合并增强配置
+            enhanced_opts = _get_enhanced_ydl_options()
+            ydl_opts.update(enhanced_opts)
+
             # 将下载添加到管理器
             download_manager.add_download(download_id, url, ydl_opts)
 
@@ -464,6 +531,10 @@ def register_routes(app):
                 'quiet': True,
                 'no_warnings': True,
             }
+
+            # 合并增强配置
+            enhanced_opts = _get_enhanced_ydl_options()
+            ydl_opts.update(enhanced_opts)
 
             # 直接下载（同步）
             with YoutubeDL(ydl_opts) as ydl:
@@ -553,6 +624,10 @@ def register_routes(app):
                 'listformats': True,
                 'skip_download': True,
             }
+
+            # 合并增强配置
+            enhanced_opts = _get_enhanced_ydl_options()
+            ydl_opts.update(enhanced_opts)
 
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -794,6 +869,50 @@ def register_routes(app):
         return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename)
 
 
+def _get_enhanced_ydl_options():
+    """获取增强的 yt-dlp 配置以绕过 YouTube 检测"""
+    return {
+        # 反检测配置 - 使用 Android 客户端绕过检测
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],  # 优先使用 Android 客户端
+                'player_skip': ['webpage'],  # 跳过网页解析
+                'skip': ['hls'],  # 跳过 HLS 格式
+                'innertube_host': 'www.youtube.com',
+                'innertube_key': None,
+                'check_formats': None,
+            }
+        },
+        # Android 客户端的用户代理
+        'http_headers': {
+            'User-Agent': 'com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip',
+            'X-YouTube-Client-Name': '3',
+            'X-YouTube-Client-Version': '17.36.4',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+        },
+        # 网络配置
+        'socket_timeout': 60,
+        'retries': 5,
+        'fragment_retries': 5,
+        'retry_sleep_functions': {
+            'http': lambda n: min(2 ** n, 30),
+            'fragment': lambda n: min(2 ** n, 30),
+            'file_access': lambda n: min(2 ** n, 30),
+            'extractor': lambda n: min(2 ** n, 30),
+        },
+        # 其他反检测措施
+        'sleep_interval': 0.5,  # 请求间隔
+        'max_sleep_interval': 2,
+        'sleep_interval_subtitles': 0.5,
+        # 格式选择策略
+        'format_sort': ['res:720', 'ext:mp4:m4a'],  # 优先选择 720p MP4
+        'merge_output_format': 'mp4',  # 合并为 MP4
+    }
+
+
 def _build_ydl_options(data, download_folder):
     """根据前端选项构建 yt-dlp 配置"""
 
@@ -808,9 +927,11 @@ def _build_ydl_options(data, download_folder):
         'writeautomaticsub': False,  # 默认不下载自动字幕
         'writethumbnail': False,  # 默认不下载缩略图
         'max_filesize': 5 * 1024 * 1024 * 1024,  # 5GB 文件大小限制
-        'socket_timeout': 30,  # 30秒超时
-        'retries': 3,  # 重试3次
     }
+
+    # 合并增强配置
+    enhanced_opts = _get_enhanced_ydl_options()
+    ydl_opts.update(enhanced_opts)
 
     # 音频/视频选择
     audio_only = data.get('audio_only', False)
@@ -1015,56 +1136,123 @@ def _generate_shortcut_config(shortcut_type):
 
 def _download_worker(download_id, url, ydl_opts):
     """用于下载视频的后台工作线程"""
-    try:
-        download_manager.update_download(download_id, status='downloading')
+    max_retries = 3
+    retry_count = 0
 
-        # 添加进度钩子
-        def progress_hook(d):
-            if d['status'] == 'downloading':
-                # 更新进度信息
-                update_data = {}
+    while retry_count < max_retries:
+        try:
+            download_manager.update_download(download_id, status='downloading')
 
-                if 'total_bytes' in d and d['total_bytes']:
-                    progress = (d['downloaded_bytes'] / d['total_bytes']) * 100
-                    update_data['progress'] = progress
-                    update_data['total_bytes'] = d['total_bytes']
-                elif 'total_bytes_estimate' in d and d['total_bytes_estimate']:
-                    progress = (d['downloaded_bytes'] / d['total_bytes_estimate']) * 100
-                    update_data['progress'] = progress
-                    update_data['total_bytes'] = d['total_bytes_estimate']
+            # 添加进度钩子
+            def progress_hook(d):
+                # 清理进度数据，确保 JSON 可序列化
+                cleaned_d = download_manager._make_json_serializable(d)
 
-                if 'speed' in d and d['speed']:
-                    update_data['speed'] = d['speed']
+                if cleaned_d['status'] == 'downloading':
+                    # 更新进度信息
+                    update_data = {}
 
-                if 'eta' in d and d['eta']:
-                    update_data['eta'] = d['eta']
+                    if 'total_bytes' in cleaned_d and cleaned_d['total_bytes']:
+                        progress = (cleaned_d['downloaded_bytes'] / cleaned_d['total_bytes']) * 100
+                        update_data['progress'] = progress
+                        update_data['total_bytes'] = cleaned_d['total_bytes']
+                    elif 'total_bytes_estimate' in cleaned_d and cleaned_d['total_bytes_estimate']:
+                        progress = (cleaned_d['downloaded_bytes'] / cleaned_d['total_bytes_estimate']) * 100
+                        update_data['progress'] = progress
+                        update_data['total_bytes'] = cleaned_d['total_bytes_estimate']
 
-                download_manager.update_download(download_id, **update_data)
+                    if 'speed' in cleaned_d and cleaned_d['speed']:
+                        update_data['speed'] = cleaned_d['speed']
 
-            elif d['status'] == 'finished':
-                filename = os.path.basename(d['filename'])
-                download_manager.update_download(
-                    download_id,
-                    status='completed',
-                    progress=100,
-                    filename=filename
-                )
+                    if 'eta' in cleaned_d and cleaned_d['eta']:
+                        update_data['eta'] = cleaned_d['eta']
 
-                # 下载完成后触发清理
-                cleanup_mgr = get_cleanup_manager()
-                if cleanup_mgr:
-                    cleanup_mgr.cleanup_on_download_complete(filename)
+                    download_manager.update_download(download_id, **update_data)
 
-        ydl_opts['progress_hooks'] = [progress_hook]
+                elif cleaned_d['status'] == 'finished':
+                    filename = os.path.basename(cleaned_d['filename'])
+                    download_manager.update_download(
+                        download_id,
+                        status='completed',
+                        progress=100,
+                        filename=filename
+                    )
 
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+                    # 下载完成后触发清理
+                    cleanup_mgr = get_cleanup_manager()
+                    if cleanup_mgr:
+                        cleanup_mgr.cleanup_on_download_complete(filename)
 
-    except Exception as e:
+            ydl_opts['progress_hooks'] = [progress_hook]
+
+            # 尝试多种策略下载
+            success = False
+            last_error = None
+
+            # 策略1: 使用当前配置
+            try:
+                with YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+                success = True
+            except Exception as e:
+                last_error = e
+                logger.warning(f"下载策略1失败 (尝试 {retry_count + 1}/{max_retries}): {str(e)}")
+
+                # 策略2: 使用Web客户端
+                if not success and 'youtube.com' in url:
+                    try:
+                        fallback_opts = ydl_opts.copy()
+                        fallback_opts['extractor_args'] = {
+                            'youtube': {
+                                'player_client': ['web'],
+                            }
+                        }
+                        with YoutubeDL(fallback_opts) as ydl:
+                            ydl.download([url])
+                        success = True
+                    except Exception as e2:
+                        last_error = e2
+                        logger.warning(f"下载策略2失败 (尝试 {retry_count + 1}/{max_retries}): {str(e2)}")
+
+                # 策略3: 基础配置
+                if not success:
+                    try:
+                        basic_opts = {
+                            'outtmpl': ydl_opts['outtmpl'],
+                            'format': 'best',
+                            'quiet': True,
+                            'no_warnings': True,
+                        }
+                        with YoutubeDL(basic_opts) as ydl:
+                            ydl.download([url])
+                        success = True
+                    except Exception as e3:
+                        last_error = e3
+                        logger.warning(f"下载策略3失败 (尝试 {retry_count + 1}/{max_retries}): {str(e3)}")
+
+            if success:
+                break
+
+            retry_count += 1
+            if retry_count < max_retries:
+                import time
+                time.sleep(2 ** retry_count)  # 指数退避
+
+        except Exception as e:
+            last_error = e
+            retry_count += 1
+            logger.error(f"下载工作线程异常 (尝试 {retry_count}/{max_retries}): {str(e)}")
+
+            if retry_count < max_retries:
+                import time
+                time.sleep(2 ** retry_count)
+
+    # 所有重试都失败了
+    if retry_count >= max_retries:
         download_manager.update_download(
             download_id,
             status='error',
-            error=str(e)
+            error=f"下载失败，已重试{max_retries}次: {str(last_error) if last_error else '未知错误'}"
         )
 
 
