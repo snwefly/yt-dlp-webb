@@ -45,6 +45,22 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: 准备环境配置文件
+      run: |
+        # 确保 .env 文件存在，如果不存在则从 .env.example 复制
+        if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+          echo "📋 从 .env.example 创建 .env 文件"
+          cp .env.example .env
+        elif [ -f ".env" ]; then
+          echo "✅ .env 文件已存在"
+        else
+          echo "⚠️ 未找到 .env 或 .env.example 文件"
+        fi
+
+        # 显示文件状态
+        echo "📁 环境配置文件状态:"
+        ls -la .env* || echo "未找到环境配置文件"
+
     - name: 设置Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -83,6 +99,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: dockerfiles/Dockerfile.hybrid  # 明确指定使用混合模式 Dockerfile
         platforms: ${{ github.event.inputs.build_platforms || 'linux/amd64,linux/arm64' }}
         push: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.push_to_registry == 'true' || github.event.inputs.push_to_registry == '') }}
         tags: ${{ steps.meta.outputs.tags }}
@@ -91,6 +108,9 @@ jobs:
           BUILDTIME=${{ steps.build_info.outputs.buildtime }}
           VERSION=${{ steps.build_info.outputs.version }}
           REVISION=${{ steps.build_info.outputs.revision }}
+          YTDLP_SOURCE=github_release
+          YTDLP_VERSION=latest
+          ENVIRONMENT=production
         cache-from: type=gha
         cache-to: type=gha,mode=max
 

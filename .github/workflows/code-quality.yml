@@ -1,0 +1,212 @@
+name: Code Quality Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_lint:
+        description: '运行代码格式和风格检查'
+        required: false
+        default: false
+        type: boolean
+      run_security:
+        description: '运行安全扫描'
+        required: false
+        default: true
+        type: boolean
+      run_dockerfile_lint:
+        description: '运行Dockerfile检查'
+        required: false
+        default: false
+        type: boolean
+      run_yaml_lint:
+        description: '运行YAML文件检查'
+        required: false
+        default: false
+        type: boolean
+      run_shell_check:
+        description: '运行Shell脚本检查'
+        required: false
+        default: false
+        type: boolean
+      run_dependency_review:
+        description: '运行依赖审查'
+        required: false
+        default: false
+        type: boolean
+      run_codeql:
+        description: '运行CodeQL分析'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Code Linting
+    if: github.event.inputs.run_lint == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint black isort mypy
+        pip install -r requirements.txt
+
+    - name: Run Black (Code Formatting)
+      run: |
+        black --check --diff webapp/
+
+    - name: Run isort (Import Sorting)
+      run: |
+        isort --check-only --diff webapp/
+
+    - name: Run Flake8 (Style Guide)
+      run: |
+        flake8 webapp/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 webapp/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run Pylint (Code Analysis)
+      run: |
+        pylint webapp/ --exit-zero --output-format=text --reports=no --score=no
+
+    - name: Run MyPy (Type Checking)
+      run: |
+        mypy webapp/ --ignore-missing-imports --no-strict-optional
+      continue-on-error: true
+
+  security:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    if: github.event.inputs.run_security == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+        pip install -r requirements.txt
+
+    - name: Run Bandit (Security Issues)
+      run: |
+        bandit -r webapp/ -f json -o bandit-report.json
+      continue-on-error: true
+
+    - name: Run Safety (Dependency Vulnerabilities)
+      run: |
+        safety check --json --output safety-report.json
+      continue-on-error: true
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  dockerfile-lint:
+    runs-on: ubuntu-latest
+    name: Dockerfile Lint
+    if: github.event.inputs.run_dockerfile_lint == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Hadolint
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: Dockerfile
+        format: sarif
+        output-file: hadolint-results.sarif
+
+    - name: Upload Hadolint results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: hadolint-results.sarif
+
+  yaml-lint:
+    runs-on: ubuntu-latest
+    name: YAML Lint
+    if: github.event.inputs.run_yaml_lint == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run yamllint
+      run: |
+        pip install yamllint
+        yamllint .github/workflows/ docker-compose*.yml
+
+  shell-check:
+    runs-on: ubuntu-latest
+    name: Shell Script Check
+    if: github.event.inputs.run_shell_check == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        scandir: '.'
+        format: gcc
+        severity: warning
+
+  dependency-review:
+    runs-on: ubuntu-latest
+    name: Dependency Review
+    if: github.event.inputs.run_dependency_review == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v3
+      with:
+        fail-on-severity: moderate
+
+  codeql:
+    runs-on: ubuntu-latest
+    name: CodeQL Analysis
+    if: github.event.inputs.run_codeql == 'true'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: python
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
