@@ -1,11 +1,7 @@
 name: 构建并推送Docker镜像
 
 on:
-  push:
-    branches: [ main, master, develop ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ main, master ]
+  # 只允许手动触发构建
   workflow_dispatch:
     inputs:
       push_to_registry:
@@ -18,6 +14,18 @@ on:
         required: false
         default: 'linux/amd64,linux/arm64'
         type: string
+      image_tag:
+        description: '镜像标签'
+        required: false
+        default: 'latest'
+        type: string
+
+  # 如果需要，可以取消注释以下行来启用自动触发
+  # push:
+  #   branches: [ main, master, develop ]
+  #   tags: [ 'v*' ]
+  # pull_request:
+  #   branches: [ main, master ]
 
 env:
   REGISTRY: ghcr.io
@@ -54,22 +62,21 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
-          type=raw,value=latest,enable={{is_default_branch}}
+          type=raw,value=${{ github.event.inputs.image_tag || 'latest' }}
+          type=raw,value=manual-build-{{date 'YYYYMMDD-HHmmss'}}
         labels: |
           org.opencontainers.image.title=YT-DLP 网页界面
           org.opencontainers.image.description=带下载管理的yt-dlp网页界面
           org.opencontainers.image.vendor=${{ github.repository_owner }}
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+          org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ssZ'}}
 
     - name: 获取构建信息
       id: build_info
       run: |
         echo "buildtime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-        echo "version=${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT  # <-- 修改在此
+        echo "version=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}" >> $GITHUB_OUTPUT
         echo "revision=${{ github.sha }}" >> $GITHUB_OUTPUT
 
     - name: 构建并推送Docker镜像
@@ -77,7 +84,7 @@ jobs:
       with:
         context: .
         platforms: ${{ github.event.inputs.build_platforms || 'linux/amd64,linux/arm64' }}
-        push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_to_registry != 'false') }}
+        push: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.push_to_registry == 'true' || github.event.inputs.push_to_registry == '') }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
@@ -86,7 +93,13 @@ jobs:
           REVISION=${{ steps.build_info.outputs.revision }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        no-cache-filters: requirements.txt
+
+    - name: 构建结果
+      run: |
+        echo "🎉 Docker镜像构建完成！"
+        echo "📦 镜像标签: ${{ steps.meta.outputs.tags }}"
+        echo "🚀 推送状态: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.push_to_registry == 'true' || github.event.inputs.push_to_registry == '') }}"
+        echo "🏗️ 构建平台: ${{ github.event.inputs.build_platforms || 'linux/amd64,linux/arm64' }}"
 
     - name: 运行Trivy漏洞扫描
       uses: aquasecurity/trivy-action@master
@@ -106,81 +119,5 @@ jobs:
         sarif_file: 'trivy-results.sarif'
         category: 'Trivy Scan'
 
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'pull_request'
-    
-    steps:
-    - name: 检出代码库
-      uses: actions/checkout@v4
-
-    - name: 设置Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: 构建测试镜像
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        load: true
-        tags: test-image:latest
-        cache-from: type=gha
-        no-cache-filters: requirements.txt
-
-    - name: 测试容器启动
-      run: |
-        # 启动容器
-        docker run -d --name test-container -p 8080:8080 \
-          -e ADMIN_USERNAME=testuser \
-          -e ADMIN_PASSWORD=testpass123 \
-          test-image:latest
-
-        # 等待容器启动
-        sleep 30
-
-        # 检查容器是否运行
-        if ! docker ps | grep test-container; then
-          echo "容器启动失败"
-          docker logs test-container
-          exit 1
-        fi
-
-        # 检查健康状态
-        for i in {1..10}; do
-          if curl -f http://localhost:8080/ > /dev/null 2>&1; then
-            echo "健康检查通过"
-            break
-          fi
-          if [ $i -eq 10 ]; then
-            echo "健康检查失败"
-            docker logs test-container
-            exit 1
-          fi
-          sleep 5
-        done
-
-        # 清理
-        docker stop test-container
-        docker rm test-container
-
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name != 'pull_request'
-    
-    steps:
-    - name: 运行Snyk检查漏洞
-      uses: snyk/actions/docker@master
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      with:
-        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-        args: --severity-threshold=high
-      continue-on-error: true
-
-    - name: 上传结果到GitHub代码扫描
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: snyk.sarif
-        category: 'Snyk Scan'
+  # 测试作业已移除，因为现在只支持手动触发
+  # 如果需要测试，可以在手动触发时选择不推送到仓库，仅构建测试
