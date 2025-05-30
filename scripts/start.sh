@@ -14,10 +14,29 @@ export YTDLP_NO_LAZY_EXTRACTORS=1
 echo "🔧 创建并设置目录权限..."
 mkdir -p $DOWNLOAD_FOLDER
 mkdir -p /app/config
+mkdir -p /app/logs
+mkdir -p /app/yt-dlp-cache
 
-# 设置下载目录权限
+# 强制修复目录权限
 echo "📁 下载目录: $DOWNLOAD_FOLDER"
-chmod 755 $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ 无法设置目录权限"
+echo "👤 当前用户: $(whoami)"
+echo "🆔 用户ID: $(id)"
+
+# 尝试多种方式修复权限
+echo "🔧 修复目录权限..."
+chmod 777 $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ chmod 777 失败"
+chmod 777 /app/config 2>/dev/null || echo "⚠️ chmod /app/config 失败"
+chmod 777 /app/logs 2>/dev/null || echo "⚠️ chmod /app/logs 失败"
+chmod 777 /app/yt-dlp-cache 2>/dev/null || echo "⚠️ chmod /app/yt-dlp-cache 失败"
+
+# 如果是 root 用户，尝试 chown
+if [ "$(id -u)" = "0" ]; then
+    echo "🔧 以 root 身份修复所有权..."
+    chown -R ytdlp:ytdlp $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ chown 下载目录失败"
+    chown -R ytdlp:ytdlp /app/config 2>/dev/null || echo "⚠️ chown config 失败"
+    chown -R ytdlp:ytdlp /app/logs 2>/dev/null || echo "⚠️ chown logs 失败"
+    chown -R ytdlp:ytdlp /app/yt-dlp-cache 2>/dev/null || echo "⚠️ chown cache 失败"
+fi
 
 # 测试目录写入权限
 echo "🧪 测试目录写入权限..."
@@ -25,11 +44,23 @@ if touch "$DOWNLOAD_FOLDER/test_write_permission" 2>/dev/null; then
     rm "$DOWNLOAD_FOLDER/test_write_permission" 2>/dev/null
     echo "✅ 下载目录权限验证成功: $DOWNLOAD_FOLDER"
 else
-    echo "⚠️ 下载目录写入权限测试失败，但继续启动..."
-    echo "📋 目录信息:"
+    echo "⚠️ 下载目录写入权限测试失败"
+    echo "📋 详细目录信息:"
     ls -la "$DOWNLOAD_FOLDER" 2>/dev/null || echo "无法列出目录内容"
-    echo "👤 当前用户: $(whoami)"
-    echo "🆔 用户ID: $(id)"
+    ls -la "$(dirname $DOWNLOAD_FOLDER)" 2>/dev/null || echo "无法列出父目录内容"
+
+    # 尝试创建临时目录作为备用
+    TEMP_DOWNLOAD_DIR="/tmp/downloads"
+    echo "🔄 尝试使用临时下载目录: $TEMP_DOWNLOAD_DIR"
+    mkdir -p "$TEMP_DOWNLOAD_DIR"
+    chmod 777 "$TEMP_DOWNLOAD_DIR" 2>/dev/null
+    if touch "$TEMP_DOWNLOAD_DIR/test_write_permission" 2>/dev/null; then
+        rm "$TEMP_DOWNLOAD_DIR/test_write_permission" 2>/dev/null
+        export DOWNLOAD_FOLDER="$TEMP_DOWNLOAD_DIR"
+        echo "✅ 使用临时下载目录: $TEMP_DOWNLOAD_DIR"
+    else
+        echo "❌ 临时目录也无法写入，但继续启动..."
+    fi
 fi
 
 # 设置Python路径

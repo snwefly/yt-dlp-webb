@@ -20,8 +20,23 @@ class AuthManager:
             os.environ.get('ADMIN_PASSWORD', 'admin123')
         )
 
-        # 会话配置
-        self.session_timeout_hours = 24
+        # 会话配置 - 支持环境变量配置
+        # 默认30天，可通过环境变量 SESSION_TIMEOUT_DAYS 配置
+        timeout_days = int(os.environ.get('SESSION_TIMEOUT_DAYS', '30'))
+        self.session_timeout_hours = timeout_days * 24
+
+        # 也支持直接设置小时数 SESSION_TIMEOUT_HOURS（优先级更高）
+        if 'SESSION_TIMEOUT_HOURS' in os.environ:
+            self.session_timeout_hours = int(os.environ.get('SESSION_TIMEOUT_HOURS'))
+
+        # 最小1小时，最大365天
+        self.session_timeout_hours = max(1, min(self.session_timeout_hours, 365 * 24))
+
+        # 活动延长配置 - 每次活动是否延长会话
+        self.extend_on_activity = os.environ.get('EXTEND_SESSION_ON_ACTIVITY', 'true').lower() == 'true'
+
+        # 活动延长的最大时间（小时）- 防止会话无限延长
+        self.max_extension_hours = int(os.environ.get('MAX_SESSION_EXTENSION_HOURS', str(self.session_timeout_hours)))
 
         # 存储活跃会话
         self.active_sessions = {}
@@ -55,14 +70,26 @@ class AuthManager:
             return False
 
         session_data = self.active_sessions[session_token]
+        current_time = datetime.now()
 
         # 检查会话是否过期
-        if datetime.now() - session_data['created_at'] > timedelta(hours=self.session_timeout_hours):
+        session_age = current_time - session_data['created_at']
+        if session_age > timedelta(hours=self.session_timeout_hours):
             del self.active_sessions[session_token]
             return False
 
+        # 如果启用活动延长，检查是否需要延长会话
+        if self.extend_on_activity:
+            # 检查会话是否已经延长太久
+            if session_age <= timedelta(hours=self.max_extension_hours):
+                # 如果距离上次活动超过1小时，则延长会话
+                time_since_activity = current_time - session_data['last_activity']
+                if time_since_activity > timedelta(hours=1):
+                    # 重置创建时间，相当于延长会话
+                    session_data['created_at'] = current_time - timedelta(hours=1)
+
         # 更新最后活动时间
-        session_data['last_activity'] = datetime.now()
+        session_data['last_activity'] = current_time
         return True
 
     def get_session_user(self, session_token):
@@ -70,6 +97,29 @@ class AuthManager:
         if session_token in self.active_sessions:
             return self.active_sessions[session_token]['username']
         return None
+
+    def get_session_info(self, session_token):
+        """获取会话详细信息"""
+        if session_token not in self.active_sessions:
+            return None
+
+        session_data = self.active_sessions[session_token]
+        current_time = datetime.now()
+
+        # 计算会话剩余时间
+        session_age = current_time - session_data['created_at']
+        remaining_time = timedelta(hours=self.session_timeout_hours) - session_age
+
+        return {
+            'username': session_data['username'],
+            'created_at': session_data['created_at'].isoformat(),
+            'last_activity': session_data['last_activity'].isoformat(),
+            'session_age_hours': round(session_age.total_seconds() / 3600, 2),
+            'remaining_hours': max(0, round(remaining_time.total_seconds() / 3600, 2)),
+            'timeout_hours': self.session_timeout_hours,
+            'extend_on_activity': self.extend_on_activity,
+            'max_extension_hours': self.max_extension_hours
+        }
 
     def destroy_session(self, session_token):
         """销毁会话"""

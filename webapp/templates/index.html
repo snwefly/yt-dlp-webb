@@ -1249,6 +1249,44 @@
             return headers;
         }
 
+        // 通用 API 请求函数，自动处理认证错误
+        async function apiRequest(url, options = {}) {
+            const token = localStorage.getItem('auth_token');
+            const headers = options.headers || {};
+
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const requestOptions = {
+                ...options,
+                headers: headers
+            };
+
+            try {
+                const response = await fetch(url, requestOptions);
+
+                // 处理认证错误
+                if (response.status === 401) {
+                    console.warn('认证失败，清除token并跳转到登录页');
+                    localStorage.removeItem('auth_token');
+                    showMessage('会话已过期，请重新登录', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    throw new Error('Authentication failed');
+                }
+
+                return response;
+            } catch (error) {
+                if (error.message === 'Authentication failed') {
+                    throw error;
+                }
+                console.error('API request failed:', error);
+                throw error;
+            }
+        }
+
         // 获取视频信息
         async function getVideoInfo() {
             const url = document.getElementById('url').value.trim();
@@ -1260,9 +1298,11 @@
             setLoading('info-btn-text', 'info-loading', true);
 
             try {
-                const response = await fetch('/api/info', {
+                const response = await apiRequest('/api/info', {
                     method: 'POST',
-                    headers: getAuthHeaders(),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({ url: url })
                 });
 
@@ -1275,7 +1315,9 @@
                     showMessage(data.error || '获取视频信息失败', 'error');
                 }
             } catch (error) {
-                showMessage('网络错误：' + error.message, 'error');
+                if (error.message !== 'Authentication failed') {
+                    showMessage('网络错误：' + error.message, 'error');
+                }
             } finally {
                 setLoading('info-btn-text', 'info-loading', false);
             }
@@ -1323,9 +1365,11 @@
             setLoading('download-btn-text', 'download-loading', true);
 
             try {
-                const response = await fetch('/api/download', {
+                const response = await apiRequest('/api/download', {
                     method: 'POST',
-                    headers: getAuthHeaders(),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(options)
                 });
 
@@ -1340,7 +1384,9 @@
                     showMessage(data.error || '开始下载失败', 'error');
                 }
             } catch (error) {
-                showMessage('网络错误：' + error.message, 'error');
+                if (error.message !== 'Authentication failed') {
+                    showMessage('网络错误：' + error.message, 'error');
+                }
             } finally {
                 setLoading('download-btn-text', 'download-loading', false);
             }
@@ -1359,15 +1405,7 @@
             if (!currentDownloadId) return;
 
             try {
-                const token = localStorage.getItem('auth_token');
-                const headers = {};
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-
-                const response = await fetch(`/api/download/${currentDownloadId}/status`, {
-                    headers: headers
-                });
+                const response = await apiRequest(`/api/download/${currentDownloadId}/status`);
                 const data = await response.json();
 
                 if (response.ok) {
@@ -1378,9 +1416,19 @@
                         statusCheckInterval = null;
                         loadRecentDownloads();
                     }
+                } else {
+                    console.error('Status check failed:', response.status, data);
+                    showMessage(data.error || '状态检查失败', 'error');
                 }
             } catch (error) {
-                console.error('Error checking download status:', error);
+                if (error.message === 'Authentication failed') {
+                    // 认证失败时停止状态检查
+                    clearInterval(statusCheckInterval);
+                    statusCheckInterval = null;
+                } else {
+                    console.error('Error checking download status:', error);
+                    showMessage('网络错误：' + error.message, 'error');
+                }
             }
         }
 
@@ -1442,22 +1490,20 @@
         // 加载最近下载
         async function loadRecentDownloads() {
             try {
-                const token = localStorage.getItem('auth_token');
-                const headers = {};
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-
-                const response = await fetch('/api/downloads', {
-                    headers: headers
-                });
+                const response = await apiRequest('/api/downloads');
                 const data = await response.json();
 
                 if (response.ok) {
                     displayRecentDownloads(data.downloads);
+                } else {
+                    console.error('Failed to load downloads:', response.status, data);
+                    showMessage(data.error || '加载下载列表失败', 'error');
                 }
             } catch (error) {
-                console.error('Error loading recent downloads:', error);
+                if (error.message !== 'Authentication failed') {
+                    console.error('Error loading recent downloads:', error);
+                    showMessage('网络错误：' + error.message, 'error');
+                }
             }
         }
 

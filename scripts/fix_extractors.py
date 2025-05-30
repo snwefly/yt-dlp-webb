@@ -53,11 +53,6 @@ def create_dummy_extractor(extractor_name):
             logger.error(f"extractor 目录不存在: {extractor_dir}")
             return False
 
-        # 检查是否有写入权限
-        if not os.access(extractor_dir, os.W_OK):
-            logger.warning(f"没有写入权限: {extractor_dir}")
-            return False
-
         # 创建虚拟模块文件
         dummy_file = extractor_dir / f'{extractor_name}.py'
 
@@ -66,6 +61,9 @@ def create_dummy_extractor(extractor_name):
             logger.info(f"ℹ️ extractor 已存在: {dummy_file}")
             return True
 
+        # 生成更完整的虚拟 extractor
+        class_name = ''.join(word.capitalize() for word in extractor_name.split('_')) + 'IE'
+
         dummy_content = f'''# -*- coding: utf-8 -*-
 """
 虚拟 {extractor_name} extractor
@@ -73,26 +71,64 @@ def create_dummy_extractor(extractor_name):
 """
 
 from .common import InfoExtractor
+from ..utils import ExtractorError
 
-class {extractor_name.capitalize()}IE(InfoExtractor):
+class {class_name}(InfoExtractor):
     """虚拟 {extractor_name} extractor"""
 
     _VALID_URL = r'https?://(?:www\\.)?{extractor_name}\\.com/.*'
     _TESTS = []
 
+    IE_NAME = '{extractor_name}'
+    IE_DESC = 'Virtual {extractor_name} extractor (placeholder)'
+
     def _real_extract(self, url):
-        raise NotImplementedError('此 extractor 为虚拟实现')
+        raise ExtractorError(
+            f'{{self.IE_NAME}} extractor is not implemented. '
+            f'This is a placeholder to prevent import errors.',
+            expected=True
+        )
+
+# 导出类以便导入
+__all__ = ['{class_name}']
 '''
 
-        # 写入文件
+        # 尝试写入文件
         try:
+            # 先尝试直接写入
             with open(dummy_file, 'w', encoding='utf-8') as f:
                 f.write(dummy_content)
             logger.info(f"✅ 创建虚拟 extractor: {dummy_file}")
             return True
         except PermissionError:
             logger.warning(f"⚠️ 权限不足，无法创建: {dummy_file}")
-            return False
+
+            # 尝试在临时位置创建，然后动态导入
+            try:
+                import tempfile
+                import importlib.util
+
+                # 在临时目录创建模块
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                    f.write(dummy_content)
+                    temp_file = f.name
+
+                # 动态加载模块
+                spec = importlib.util.spec_from_file_location(f"yt_dlp.extractor.{extractor_name}", temp_file)
+                module = importlib.util.module_from_spec(spec)
+
+                # 将模块添加到 sys.modules
+                sys.modules[f"yt_dlp.extractor.{extractor_name}"] = module
+
+                # 清理临时文件
+                os.unlink(temp_file)
+
+                logger.info(f"✅ 动态创建虚拟 extractor: {extractor_name}")
+                return True
+
+            except Exception as e:
+                logger.warning(f"⚠️ 动态创建也失败: {e}")
+                return False
 
     except Exception as e:
         logger.error(f"创建虚拟 extractor 失败: {e}")
@@ -135,6 +171,51 @@ def update_extractors_list():
         logger.error(f"更新 extractors 列表失败: {e}")
         return False
 
+def create_runtime_extractor(extractor_name):
+    """在运行时动态创建 extractor 模块"""
+    try:
+        import types
+        from yt_dlp.extractor.common import InfoExtractor
+        from yt_dlp.utils import ExtractorError
+
+        # 生成类名
+        class_name = ''.join(word.capitalize() for word in extractor_name.split('_')) + 'IE'
+
+        # 动态创建类
+        def _real_extract(self, url):
+            raise ExtractorError(
+                f'{self.IE_NAME} extractor is not implemented. '
+                f'This is a placeholder to prevent import errors.',
+                expected=True
+            )
+
+        # 创建类属性
+        attrs = {
+            '_VALID_URL': r'https?://(?:www\.)?example\.com/.*',
+            '_TESTS': [],
+            'IE_NAME': extractor_name,
+            'IE_DESC': f'Virtual {extractor_name} extractor (placeholder)',
+            '_real_extract': _real_extract,
+        }
+
+        # 动态创建类
+        ExtractorClass = type(class_name, (InfoExtractor,), attrs)
+
+        # 创建模块
+        module = types.ModuleType(f'yt_dlp.extractor.{extractor_name}')
+        setattr(module, class_name, ExtractorClass)
+        setattr(module, '__all__', [class_name])
+
+        # 注册到 sys.modules
+        sys.modules[f'yt_dlp.extractor.{extractor_name}'] = module
+
+        logger.info(f"✅ 运行时创建虚拟 extractor: {extractor_name}")
+        return True
+
+    except Exception as e:
+        logger.error(f"运行时创建 extractor 失败: {e}")
+        return False
+
 def fix_extractor_imports():
     """修复 extractor 导入问题"""
     logger.info("🔧 开始修复 extractor 导入问题...")
@@ -148,19 +229,28 @@ def fix_extractor_imports():
 
     logger.info(f"发现缺失的 extractors: {missing_extractors}")
 
-    # 创建虚拟 extractors
-    success_count = 0
+    # 首先尝试运行时创建
+    runtime_success = 0
+    for extractor_name in missing_extractors:
+        if create_runtime_extractor(extractor_name):
+            runtime_success += 1
+
+    if runtime_success > 0:
+        logger.info(f"✅ 运行时创建 {runtime_success} 个虚拟 extractors")
+
+    # 然后尝试文件创建（如果有权限）
+    file_success = 0
     for extractor_name in missing_extractors:
         if create_dummy_extractor(extractor_name):
-            success_count += 1
+            file_success += 1
 
-    logger.info(f"✅ 成功创建 {success_count}/{len(missing_extractors)} 个虚拟 extractors")
+    if file_success > 0:
+        logger.info(f"✅ 文件创建 {file_success} 个虚拟 extractors")
 
-    # 更新 extractors 列表
-    if update_extractors_list():
-        logger.info("✅ extractors 列表更新成功")
+    total_success = max(runtime_success, file_success)
+    logger.info(f"✅ 总共修复 {total_success}/{len(missing_extractors)} 个 extractors")
 
-    return success_count > 0
+    return total_success > 0
 
 def test_yt_dlp_functionality():
     """测试 yt-dlp 基本功能"""

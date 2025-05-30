@@ -104,3 +104,33 @@ def api_verify():
     except Exception as e:
         logger.error(f"会话验证过程中发生错误: {e}")
         return jsonify({'error': str(e)}), 500
+
+@auth_bp.route('/api/auth/session-info', methods=['GET'])
+def api_session_info():
+    """获取会话详细信息"""
+    try:
+        # 检查会话token
+        auth_token = request.headers.get('Authorization')
+        if auth_token and auth_token.startswith('Bearer '):
+            token = auth_token.split(' ')[1]
+            session_info = auth_manager.get_session_info(token)
+            if session_info:
+                return jsonify({
+                    'success': True,
+                    'session_info': session_info
+                })
+
+        # 检查session
+        if 'auth_token' in session:
+            session_info = auth_manager.get_session_info(session['auth_token'])
+            if session_info:
+                return jsonify({
+                    'success': True,
+                    'session_info': session_info
+                })
+
+        return jsonify({'error': '无效的会话'}), 401
+
+    except Exception as e:
+        logger.error(f"获取会话信息时发生错误: {e}")
+        return jsonify({'error': str(e)}), 500

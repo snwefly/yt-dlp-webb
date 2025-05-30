@@ -67,9 +67,27 @@ class YtdlpManager:
 
         return self._available
 
+    def _preload_common_extractors(self):
+        """预加载常见的缺失 extractor"""
+        common_missing = [
+            'screencastify', 'screen9', 'screencast', 'screencastomatic',
+            'screenrec', 'scribd', 'scrolller', 'scte', 'sendtonews'
+        ]
+
+        for extractor_name in common_missing:
+            try:
+                # 尝试导入，如果失败则动态创建
+                module_name = f'yt_dlp.extractor.{extractor_name}'
+                __import__(module_name)
+            except ImportError:
+                self._fix_missing_extractor(extractor_name)
+
     def _run_extractor_fix(self):
         """运行 extractor 修复"""
         try:
+            # 首先预加载常见的缺失 extractor
+            self._preload_common_extractors()
+
             import subprocess
             import sys
 
@@ -102,6 +120,52 @@ class YtdlpManager:
             return self.initialize()
         return self._available
 
+    def _fix_missing_extractor(self, extractor_name):
+        """动态修复缺失的 extractor"""
+        try:
+            import types
+            import sys
+            from yt_dlp.extractor.common import InfoExtractor
+            from yt_dlp.utils import ExtractorError
+
+            # 生成类名
+            class_name = ''.join(word.capitalize() for word in extractor_name.split('_')) + 'IE'
+
+            # 动态创建类
+            def _real_extract(self, url):
+                raise ExtractorError(
+                    f'{self.IE_NAME} extractor is not implemented. '
+                    f'This is a placeholder to prevent import errors.',
+                    expected=True
+                )
+
+            # 创建类属性
+            attrs = {
+                '_VALID_URL': r'https?://(?:www\.)?example\.com/.*',
+                '_TESTS': [],
+                'IE_NAME': extractor_name,
+                'IE_DESC': f'Virtual {extractor_name} extractor (placeholder)',
+                '_real_extract': _real_extract,
+            }
+
+            # 动态创建类
+            ExtractorClass = type(class_name, (InfoExtractor,), attrs)
+
+            # 创建模块
+            module = types.ModuleType(f'yt_dlp.extractor.{extractor_name}')
+            setattr(module, class_name, ExtractorClass)
+            setattr(module, '__all__', [class_name])
+
+            # 注册到 sys.modules
+            sys.modules[f'yt_dlp.extractor.{extractor_name}'] = module
+
+            logger.debug(f"✅ 动态修复 extractor: {extractor_name}")
+            return True
+
+        except Exception as e:
+            logger.debug(f"⚠️ 动态修复 extractor 失败: {e}")
+            return False
+
     def create_downloader(self, options=None):
         """创建 yt-dlp 下载器实例"""
         if not self.is_available():
@@ -125,8 +189,22 @@ class YtdlpManager:
             try:
                 return YoutubeDL(default_options)
             except ImportError as ie:
-                if 'extractor' in str(ie):
+                error_msg = str(ie)
+                if 'extractor' in error_msg:
                     logger.warning(f"⚠️ extractor 导入警告: {ie}")
+
+                    # 尝试提取缺失的 extractor 名称
+                    if "No module named 'yt_dlp.extractor." in error_msg:
+                        extractor_name = error_msg.split("'yt_dlp.extractor.")[1].split("'")[0]
+                        logger.info(f"🔧 尝试动态修复缺失的 extractor: {extractor_name}")
+
+                        if self._fix_missing_extractor(extractor_name):
+                            # 重试创建下载器
+                            try:
+                                return YoutubeDL(default_options)
+                            except Exception:
+                                pass  # 如果还是失败，继续使用最小配置
+
                     # 使用最小配置重试
                     minimal_options = {
                         'quiet': True,
