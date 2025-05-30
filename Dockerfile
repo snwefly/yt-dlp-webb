@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
     dos2unix \
+    ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
@@ -49,7 +50,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
 COPY webapp /app/webapp
-COPY yt_dlp /app/yt_dlp
+COPY ../yt_dlp /app/yt_dlp
 COPY start.sh /app/
 
 # 验证项目结构
