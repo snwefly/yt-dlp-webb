@@ -14,7 +14,7 @@ import os
 logger = logging.getLogger(__name__)
 api_bp = Blueprint('api', __name__)
 
-@api_bp.route('/info', methods=['POST'])
+@api_bp.route('/info', methods=['GET', 'POST'])
 @login_required
 def get_video_info():
     """获取视频信息而不下载"""
@@ -24,11 +24,20 @@ def get_video_info():
         if not ytdlp_manager.is_available():
             return jsonify({'error': 'yt-dlp 服务不可用'}), 503
 
-        data = request.get_json()
-        if not data or 'url' not in data:
-            return jsonify({'error': '需要提供 URL'}), 400
+        # 支持 GET 和 POST 两种方法
+        if request.method == 'GET':
+            # GET 请求从查询参数获取 URL
+            url = request.args.get('url')
+            if not url:
+                return jsonify({'error': '需要提供 URL 参数'}), 400
+        else:
+            # POST 请求从 JSON 数据获取 URL
+            data = request.get_json()
+            if not data or 'url' not in data:
+                return jsonify({'error': '需要提供 URL'}), 400
+            url = data['url']
 
-        url = data['url'].strip()
+        url = url.strip()
 
         # 验证URL安全性
         is_valid, error_msg = validate_url(url)
