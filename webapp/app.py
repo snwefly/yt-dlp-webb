@@ -160,13 +160,29 @@ def create_app(config=None):
 
     # 确保下载文件夹存在并设置正确权限
     download_folder = app.config['DOWNLOAD_FOLDER']
-    os.makedirs(download_folder, exist_ok=True)
-
-    # 尝试修复权限问题
     try:
-        # 设置目录权限为775（所有者和组可读写执行，其他用户可读执行）
-        os.chmod(download_folder, 0o775)
-        logger.info(f"下载目录权限已设置: {download_folder}")
+        os.makedirs(download_folder, exist_ok=True)
+        logger.info(f"下载目录已创建: {download_folder}")
+    except Exception as e:
+        logger.warning(f"无法创建下载目录: {e}")
+
+    # 尝试修复权限问题（仅在有权限时）
+    try:
+        # 检查目录是否存在且可写
+        if os.path.exists(download_folder) and os.access(download_folder, os.W_OK):
+            # 只有在当前用户有权限时才尝试设置权限
+            current_stat = os.stat(download_folder)
+            if os.getuid() == 0 or os.getuid() == current_stat.st_uid:
+                os.chmod(download_folder, 0o775)
+                logger.info(f"下载目录权限已设置: {download_folder}")
+            else:
+                logger.info(f"下载目录已存在且可写: {download_folder}")
+        else:
+            logger.warning(f"下载目录不存在或不可写: {download_folder}")
+    except (OSError, AttributeError) as e:
+        # OSError: 权限问题
+        # AttributeError: Windows 系统可能没有 os.getuid()
+        logger.info(f"跳过权限设置（可能在Windows或受限环境中）: {e}")
     except Exception as e:
         logger.warning(f"无法设置下载目录权限: {e}")
 
