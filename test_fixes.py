@@ -122,6 +122,43 @@ def test_ytdlp_manager():
         logger.error(f"❌ ytdlp_manager 测试失败: {e}")
         return False
 
+def test_health_endpoint():
+    """测试健康检查端点"""
+    logger.info("🔍 测试健康检查端点...")
+
+    try:
+        sys.path.insert(0, '/app')
+        from webapp.app import create_app
+
+        app = create_app()
+
+        with app.test_client() as client:
+            # 测试健康检查端点
+            response = client.get('/health')
+
+            if response.status_code == 200:
+                logger.info("✅ 健康检查端点响应正常")
+
+                # 检查响应内容
+                try:
+                    data = response.get_json()
+                    if data and 'status' in data:
+                        logger.info(f"✅ 健康检查状态: {data['status']}")
+                        return True
+                    else:
+                        logger.warning("⚠️ 健康检查响应格式异常")
+                        return False
+                except Exception as e:
+                    logger.warning(f"⚠️ 健康检查响应解析失败: {e}")
+                    return False
+            else:
+                logger.error(f"❌ 健康检查端点返回错误状态码: {response.status_code}")
+                return False
+
+    except Exception as e:
+        logger.error(f"❌ 健康检查端点测试失败: {e}")
+        return False
+
 def main():
     """主测试函数"""
     logger.info("🚀 开始测试修复效果...")
@@ -132,6 +169,7 @@ def main():
         ("extractor 处理机制", test_extractor_handling),
         ("webapp 模块", test_webapp_import),
         ("ytdlp_manager", test_ytdlp_manager),
+        ("健康检查端点", test_health_endpoint),
     ]
 
     results = []
