@@ -25,6 +25,7 @@ ENV VERSION=${VERSION}
 ENV REVISION=${REVISION}
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONPATH=/app
+ENV YTDLP_NO_LAZY_EXTRACTORS=1
 
 # 创建非root用户（提前创建以提高安全性）
 RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
