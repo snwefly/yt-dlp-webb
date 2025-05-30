@@ -81,10 +81,15 @@ RUN dos2unix /app/start.sh && \
     echo "start.sh 权限设置完成" && \
     ls -la /app/start.sh
 
-# 创建必要目录并设置权限
+# 创建必要目录并设置正确权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
-    && chmod 755 /app/downloads /app/config /app/logs
+    && chmod 755 /app/downloads /app/config /app/logs \
+    && echo "=== 验证目录权限 ===" \
+    && ls -la /app/ \
+    && echo "downloads 目录详情:" \
+    && ls -ld /app/downloads \
+    && echo "权限验证完成"
 
 # 测试项目模块导入（非阻塞式）
 RUN echo "=== 测试项目模块导入 ===" && \
@@ -115,11 +120,16 @@ print('✅ 构建时模块测试完成'); \
 USER ytdlp
 
 # 验证用户权限和目录访问
-RUN echo "验证用户权限..." && \
+RUN echo "=== 验证用户权限 ===" && \
     whoami && \
     id && \
+    echo "当前用户目录权限:" && \
     ls -la /app/ && \
+    echo "downloads 目录权限:" && \
+    ls -ld /app/downloads && \
+    echo "测试写入权限:" && \
     touch /app/downloads/test_file && \
+    echo "测试文件创建成功" && \
     rm /app/downloads/test_file && \
     echo "✅ 下载目录权限验证成功"
 

@@ -27,19 +27,51 @@ import os
 os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
 
 # 预加载 yt-dlp extractors 以避免运行时导入错误
-try:
-    from yt_dlp.extractor import import_extractors
-    import_extractors()
-    logger.info("Successfully preloaded yt-dlp extractors")
-except Exception as e:
-    logger.warning(f"Failed to preload extractors: {e}")
-    # 尝试手动导入一些常用的 extractors
+def _preload_extractors():
+    """预加载 yt-dlp extractors"""
     try:
+        # 强制禁用懒加载
+        import os
+        os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
+
+        # 尝试导入 extractors 模块
+        from yt_dlp.extractor import extractors
+        logger.info("✅ extractors 模块导入成功")
+
+        # 尝试导入基础 extractors
         from yt_dlp.extractor.youtube import YoutubeIE
         from yt_dlp.extractor.generic import GenericIE
-        logger.info("Successfully imported basic extractors")
-    except Exception as e2:
-        logger.error(f"Failed to import basic extractors: {e2}")
+        logger.info("✅ 基础 extractors 导入成功")
+
+        # 尝试使用 import_extractors 函数
+        try:
+            from yt_dlp.extractor import import_extractors
+            import_extractors()
+            logger.info("✅ import_extractors 执行成功")
+        except Exception as e:
+            logger.warning(f"⚠️ import_extractors 失败，但基础功能可用: {e}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ extractors 预加载失败: {e}")
+        # 尝试最基础的导入
+        try:
+            from yt_dlp import YoutubeDL
+            # 创建一个测试实例来验证基础功能
+            ydl = YoutubeDL({'quiet': True, 'no_warnings': True})
+            logger.info("✅ YoutubeDL 基础功能可用")
+            return True
+        except Exception as e2:
+            logger.error(f"❌ 连基础 YoutubeDL 都无法使用: {e2}")
+            return False
+
+# 执行预加载
+_preload_success = _preload_extractors()
+if _preload_success:
+    logger.info("✅ yt-dlp 模块预加载完成")
+else:
+    logger.error("❌ yt-dlp 模块预加载失败，可能影响下载功能")
 
 
 class DownloadManager:
@@ -187,38 +219,68 @@ def create_app(config=None):
 
     # 验证下载目录权限
     try:
-        # 测试写入权限
-        test_file = os.path.join(download_folder, '.write_test')
-        try:
-            with open(test_file, 'w') as f:
-                f.write('test')
-            os.remove(test_file)
-            logger.info(f"下载目录权限验证成功: {download_folder}")
-        except Exception as e:
-            logger.warning(f"下载目录写入权限测试失败: {e}")
-            logger.info(f"目录状态: 存在={os.path.exists(download_folder)}, 可读={os.access(download_folder, os.R_OK)}, 可写={os.access(download_folder, os.W_OK)}")
+        # 检查目录基本状态
+        dir_exists = os.path.exists(download_folder)
+        dir_readable = os.access(download_folder, os.R_OK) if dir_exists else False
+        dir_writable = os.access(download_folder, os.W_OK) if dir_exists else False
 
-            # 尝试修复权限（仅在有权限时）
+        logger.info(f"下载目录状态: 存在={dir_exists}, 可读={dir_readable}, 可写={dir_writable}")
+
+        if dir_exists and dir_writable:
+            # 测试实际写入权限
+            test_file = os.path.join(download_folder, '.write_test')
             try:
-                if hasattr(os, 'getuid'):  # Unix-like 系统
-                    current_stat = os.stat(download_folder)
-                    if os.getuid() == 0 or os.getuid() == current_stat.st_uid:
-                        os.chmod(download_folder, 0o755)
-                        logger.info(f"已尝试修复下载目录权限: {download_folder}")
-                    else:
-                        logger.info(f"无权限修改目录权限，当前用户: {os.getuid()}, 目录所有者: {current_stat.st_uid}")
-                else:
-                    logger.info("Windows系统，跳过权限修复")
-            except Exception as perm_e:
-                logger.warning(f"权限修复失败: {perm_e}")
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                logger.info(f"✅ 下载目录权限验证成功: {download_folder}")
+            except Exception as e:
+                logger.error(f"❌ 下载目录写入测试失败: {e}")
+                # 尝试权限修复
+                _fix_directory_permissions(download_folder)
+        else:
+            logger.warning(f"⚠️ 下载目录权限不足: {download_folder}")
+            # 尝试权限修复
+            _fix_directory_permissions(download_folder)
 
     except Exception as e:
-        logger.warning(f"下载目录验证失败: {e}")
+        logger.error(f"下载目录验证异常: {e}")
         logger.info(f"当前工作目录: {os.getcwd()}")
         if hasattr(os, 'getuid'):
             logger.info(f"用户ID: {os.getuid()}, 组ID: {os.getgid()}")
+
+
+def _fix_directory_permissions(directory):
+    """尝试修复目录权限"""
+    try:
+        if not os.path.exists(directory):
+            logger.warning(f"目录不存在，无法修复权限: {directory}")
+            return
+
+        if hasattr(os, 'getuid'):  # Unix-like 系统
+            current_stat = os.stat(directory)
+            current_uid = os.getuid()
+            dir_owner_uid = current_stat.st_uid
+
+            logger.info(f"权限诊断 - 当前用户: {current_uid}, 目录所有者: {dir_owner_uid}")
+
+            if current_uid == 0:  # root 用户
+                os.chmod(directory, 0o755)
+                os.chown(directory, 1000, 1000)  # 改为 ytdlp 用户
+                logger.info(f"✅ Root用户修复权限成功: {directory}")
+            elif current_uid == dir_owner_uid:  # 目录所有者
+                os.chmod(directory, 0o755)
+                logger.info(f"✅ 所有者修复权限成功: {directory}")
+            else:
+                logger.warning(f"⚠️ 无权限修改目录，当前用户: {current_uid}, 目录所有者: {dir_owner_uid}")
+                logger.info("建议: 请确保容器以正确用户运行或修复目录权限")
         else:
-            logger.info("Windows系统，无用户ID信息")
+            logger.info("Windows系统，跳过Unix权限修复")
+
+    except Exception as e:
+        logger.error(f"权限修复失败: {e}")
+        import traceback
+        logger.debug(f"权限修复异常详情: {traceback.format_exc()}")
 
     # 初始化文件清理管理器
     cleanup_config = {
