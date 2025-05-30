@@ -46,28 +46,40 @@ fi
 
 # 设置环境变量
 export PYTHONPATH="/app:$PYTHONPATH"
-export YTDLP_NO_LAZY_EXTRACTORS=1
+# 暂时禁用懒加载以避免 extractor 导入问题
+# export YTDLP_NO_LAZY_EXTRACTORS=1
 export YTDLP_IGNORE_EXTRACTOR_ERRORS=1
 
-# 创建必要目录
-log_info "创建必要目录..."
-mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache
-
-# 检查和修复权限
-log_info "检查目录权限..."
-for dir in "/app/downloads" "/app/logs" "/app/yt-dlp-cache"; do
-    if [ ! -w "$dir" ]; then
-        log_warning "目录 $dir 权限不足，尝试修复..."
+# 确保必要目录存在并有正确权限
+log_info "检查和创建必要目录..."
+for dir in "/app/downloads" "/app/config" "/app/logs" "/app/yt-dlp-cache"; do
+    if [ ! -d "$dir" ]; then
+        log_info "创建目录: $dir"
+        mkdir -p "$dir"
+        # 立即设置正确的所有权和权限
+        chown ytdlp:ytdlp "$dir" 2>/dev/null || true
         chmod 755 "$dir" 2>/dev/null || true
-        # 如果还是不行，尝试创建测试文件
-        if ! touch "$dir/.write_test" 2>/dev/null; then
-            log_error "无法写入目录 $dir"
-        else
+    fi
+
+    # 检查写入权限
+    if [ -w "$dir" ]; then
+        log_success "目录 $dir 权限正常"
+    else
+        log_warning "目录 $dir 权限不足，尝试修复..."
+        # 尝试修复权限
+        chown ytdlp:ytdlp "$dir" 2>/dev/null || true
+        chmod 755 "$dir" 2>/dev/null || true
+
+        # 再次测试写入权限
+        if touch "$dir/.write_test" 2>/dev/null; then
             rm -f "$dir/.write_test"
             log_success "目录 $dir 权限修复成功"
+        else
+            log_error "无法写入目录 $dir，权限修复失败"
+            # 显示详细的权限信息用于调试
+            ls -la "$dir" 2>/dev/null || true
+            ls -la "$(dirname "$dir")" 2>/dev/null || true
         fi
-    else
-        log_success "目录 $dir 权限正常"
     fi
 done
 

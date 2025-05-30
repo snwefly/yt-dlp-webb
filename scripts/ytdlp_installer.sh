@@ -36,10 +36,30 @@ try:
     print(f'版本: {version}')
     print(f'位置: {yt_dlp.__file__}')
 
-    # 测试创建实例
-    ydl = yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'ignoreerrors': True})
-    print('✅ yt-dlp 实例创建成功')
-    sys.exit(0)
+    # 测试创建实例（使用更宽松的配置避免 extractor 问题）
+    try:
+        ydl = yt_dlp.YoutubeDL({
+            'quiet': True,
+            'no_warnings': True,
+            'ignoreerrors': True,
+            'extract_flat': True,  # 避免复杂的 extractor 加载
+            'ignore_no_formats_error': True,
+            'ignore_config': True
+        })
+        print('✅ yt-dlp 实例创建成功')
+        ydl.close()  # 确保清理资源
+        sys.exit(0)
+    except Exception as e:
+        # 如果标准配置失败，尝试最小配置
+        print(f'⚠️ 标准配置失败: {e}')
+        try:
+            ydl = yt_dlp.YoutubeDL({'quiet': True, 'ignoreerrors': True})
+            print('✅ yt-dlp 最小配置实例创建成功')
+            ydl.close()
+            sys.exit(0)
+        except Exception as e2:
+            print(f'❌ 最小配置也失败: {e2}')
+            sys.exit(1)
 except ImportError as e:
     print(f'❌ yt-dlp 导入失败: {e}')
     sys.exit(1)

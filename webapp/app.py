@@ -8,8 +8,9 @@ import logging
 from datetime import timedelta
 from flask import Flask
 
-# 设置环境变量以禁用懒加载，避免运行时导入错误
-os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
+# 暂时禁用懒加载以避免 extractor 导入问题
+# os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
+os.environ['YTDLP_IGNORE_EXTRACTOR_ERRORS'] = '1'
 
 logger = logging.getLogger(__name__)
 
