@@ -73,22 +73,21 @@ RUN mkdir -p /app/downloads /app/config /app/logs \
     && chmod 755 /app/downloads /app/config /app/logs
 
 # 测试 yt-dlp extractors 导入（在切换用户前）
-RUN python3 -c "
-import os
-os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
-try:
-    from yt_dlp.extractor import import_extractors
-    import_extractors()
-    print('✅ Extractors 预加载成功')
-except Exception as e:
-    print(f'⚠️ Extractors 预加载失败: {e}')
-    # 尝试手动导入基础 extractors
-    try:
-        from yt_dlp.extractor.youtube import YoutubeIE
-        from yt_dlp.extractor.generic import GenericIE
-        print('✅ 基础 extractors 导入成功')
-    except Exception as e2:
-        print(f'❌ 基础 extractors 导入失败: {e2}')
+RUN python3 -c "\
+import os; \
+os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'; \
+try: \
+    from yt_dlp.extractor import import_extractors; \
+    import_extractors(); \
+    print('✅ Extractors 预加载成功'); \
+except Exception as e: \
+    print('⚠️ Extractors 预加载失败: ' + str(e)); \
+    try: \
+        from yt_dlp.extractor.youtube import YoutubeIE; \
+        from yt_dlp.extractor.generic import GenericIE; \
+        print('✅ 基础 extractors 导入成功'); \
+    except Exception as e2: \
+        print('❌ 基础 extractors 导入失败: ' + str(e2)); \
 "
 
 # 切换到非root用户
