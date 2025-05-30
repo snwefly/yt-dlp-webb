@@ -1,13 +1,19 @@
-# 核心 Web 框架
-Flask==2.3.3
-flask-cors==4.0.0
-Werkzeug==2.3.7
+# Core Web Framework
+Flask>=2.3.3
+flask-cors>=4.0.0
+Werkzeug>=2.3.7
 
-# HTTP 请求
-requests==2.31.0
+# HTTP Requests
+requests>=2.31.0
 
-# 基础依赖
-certifi==2023.11.17
+# yt-dlp related dependencies (using local source)
+pycryptodome>=3.19.0
+websockets>=12.0
+brotli>=1.1.0
+mutagen>=1.47.0
 
-# 开发和调试
-gunicorn==21.2.0
+# Basic dependencies
+certifi>=2023.11.17
+
+# Development and debugging
+gunicorn>=21.2.0

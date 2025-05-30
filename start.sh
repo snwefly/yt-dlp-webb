@@ -11,14 +11,26 @@ export DOWNLOAD_FOLDER=${DOWNLOAD_FOLDER:-/app/downloads}
 export YTDLP_NO_LAZY_EXTRACTORS=1
 
 # 创建必要的目录并设置权限
+echo "🔧 创建并设置目录权限..."
 mkdir -p $DOWNLOAD_FOLDER
 mkdir -p /app/config
 
 # 设置下载目录权限
-echo "🔧 设置下载目录权限..."
-chmod 775 $DOWNLOAD_FOLDER
-chown -R ytdlp:ytdlp $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ 无法更改所有者，继续..."
-echo "✅ 下载目录权限设置完成: $DOWNLOAD_FOLDER"
+echo "📁 下载目录: $DOWNLOAD_FOLDER"
+chmod 755 $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ 无法设置目录权限"
+
+# 测试目录写入权限
+echo "🧪 测试目录写入权限..."
+if touch "$DOWNLOAD_FOLDER/test_write_permission" 2>/dev/null; then
+    rm "$DOWNLOAD_FOLDER/test_write_permission" 2>/dev/null
+    echo "✅ 下载目录权限验证成功: $DOWNLOAD_FOLDER"
+else
+    echo "⚠️ 下载目录写入权限测试失败，但继续启动..."
+    echo "📋 目录信息:"
+    ls -la "$DOWNLOAD_FOLDER" 2>/dev/null || echo "无法列出目录内容"
+    echo "👤 当前用户: $(whoami)"
+    echo "🆔 用户ID: $(id)"
+fi
 
 # 设置Python路径
 export PYTHONPATH="/app:$PYTHONPATH"
