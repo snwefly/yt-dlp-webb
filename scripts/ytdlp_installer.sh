@@ -15,7 +15,22 @@ import sys
 try:
     import yt_dlp
     print('✅ yt-dlp 可用')
-    print(f'版本: {yt_dlp.__version__}')
+
+    # 尝试获取版本信息（多种方式）
+    version = 'Unknown'
+    try:
+        version = yt_dlp.version.__version__
+    except:
+        try:
+            version = yt_dlp.__version__
+        except:
+            try:
+                from yt_dlp.version import __version__
+                version = __version__
+            except:
+                pass
+
+    print(f'版本: {version}')
     print(f'位置: {yt_dlp.__file__}')
 
     # 测试创建实例
@@ -48,21 +63,46 @@ install_with_pip() {
 
     log_info "🔄 使用 pip 安装 yt-dlp..."
 
+    # 尝试多种安装方式
+    local pip_options="--no-cache-dir --force-reinstall"
+
+    # 如果是 root 用户，使用系统安装
+    if [ "$(id -u)" = "0" ]; then
+        pip_options="$pip_options --break-system-packages"
+    else
+        # 非 root 用户，尝试用户安装
+        pip_options="$pip_options --user"
+    fi
+
     if [ "$version" = "latest" ]; then
-        if pip install --no-cache-dir --force-reinstall yt-dlp; then
+        if pip install $pip_options yt-dlp; then
             log_success "pip 安装成功"
             return 0
         else
-            log_error "pip 安装失败"
-            return 1
+            # 如果用户安装失败，尝试不使用 --user
+            log_warning "用户安装失败，尝试系统安装..."
+            if pip install --no-cache-dir --force-reinstall yt-dlp; then
+                log_success "pip 系统安装成功"
+                return 0
+            else
+                log_error "pip 安装失败"
+                return 1
+            fi
         fi
     else
-        if pip install --no-cache-dir --force-reinstall "yt-dlp==$version"; then
+        if pip install $pip_options "yt-dlp==$version"; then
             log_success "pip 安装成功 (版本: $version)"
             return 0
         else
-            log_error "pip 安装失败 (版本: $version)"
-            return 1
+            # 如果用户安装失败，尝试不使用 --user
+            log_warning "用户安装失败，尝试系统安装..."
+            if pip install --no-cache-dir --force-reinstall "yt-dlp==$version"; then
+                log_success "pip 系统安装成功 (版本: $version)"
+                return 0
+            else
+                log_error "pip 安装失败 (版本: $version)"
+                return 1
+            fi
         fi
     fi
 }
@@ -74,8 +114,10 @@ use_build_time_ytdlp() {
     if [ -d "$source_dir/yt_dlp" ] && [ -f "$source_dir/yt_dlp/__init__.py" ]; then
         log_info "🔍 检查构建时下载的 yt-dlp..."
 
-        # 临时设置 PYTHONPATH 进行测试
-        export PYTHONPATH="$source_dir:$PYTHONPATH"
+        # 避免重复添加到 PYTHONPATH
+        if [[ ":$PYTHONPATH:" != *":$source_dir:"* ]]; then
+            export PYTHONPATH="$source_dir:$PYTHONPATH"
+        fi
 
         if check_ytdlp; then
             log_success "构建时下载的 yt-dlp 可用"
@@ -83,7 +125,8 @@ use_build_time_ytdlp() {
         else
             log_warning "构建时下载的 yt-dlp 不可用"
             # 移除无效的 PYTHONPATH
-            export PYTHONPATH="${PYTHONPATH#$source_dir:}"
+            export PYTHONPATH="${PYTHONPATH//$source_dir:/}"
+            export PYTHONPATH="${PYTHONPATH//$source_dir/}"
             return 1
         fi
     else
@@ -134,8 +177,10 @@ use_runtime_ytdlp() {
     if python "$source_manager" --config "$config_file" --target "$runtime_dir"; then
         log_success "运行时下载成功"
 
-        # 设置 PYTHONPATH 并测试
-        export PYTHONPATH="$runtime_dir:$PYTHONPATH"
+        # 避免重复添加到 PYTHONPATH
+        if [[ ":$PYTHONPATH:" != *":$runtime_dir:"* ]]; then
+            export PYTHONPATH="$runtime_dir:$PYTHONPATH"
+        fi
 
         if check_ytdlp; then
             log_success "运行时下载的 yt-dlp 可用"
@@ -143,7 +188,8 @@ use_runtime_ytdlp() {
         else
             log_warning "运行时下载的 yt-dlp 不可用"
             # 移除无效的 PYTHONPATH
-            export PYTHONPATH="${PYTHONPATH#$runtime_dir:}"
+            export PYTHONPATH="${PYTHONPATH//$runtime_dir:/}"
+            export PYTHONPATH="${PYTHONPATH//$runtime_dir/}"
             return 1
         fi
     else
