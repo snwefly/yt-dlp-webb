@@ -7,23 +7,23 @@ on:
       build_strategy:
         description: '构建策略'
         required: true
-        default: 'hybrid'
+        default: '混合模式'
         type: choice
         options:
-          - 'build-time'
-          - 'runtime'
-          - 'hybrid'
-          - 'local'
+          - '构建时下载'
+          - '运行时下载'
+          - '混合模式'
+          - '本地模式'
 
       ytdlp_source:
         description: 'yt-dlp 源类型'
         required: true
-        default: 'github_release'
+        default: 'GitHub发布版'
         type: choice
         options:
-          - 'github_release'
-          - 'pypi'
-          - 'local'
+          - 'GitHub发布版'
+          - 'PyPI官方包'
+          - '本地文件'
 
       ytdlp_version:
         description: 'yt-dlp 版本'
@@ -58,12 +58,12 @@ on:
       environment:
         description: '环境类型'
         required: false
-        default: 'production'
+        default: '生产环境'
         type: choice
         options:
-          - 'development'
-          - 'production'
-          - 'testing'
+          - '开发环境'
+          - '生产环境'
+          - '测试环境'
 
   # 自动触发（可选，默认注释）
   # push:
@@ -94,10 +94,30 @@ jobs:
     - name: 配置构建策略
       id: config
       run: |
-        STRATEGY="${{ github.event.inputs.build_strategy || 'hybrid' }}"
-        YTDLP_SOURCE="${{ github.event.inputs.ytdlp_source || 'github_release' }}"
+        # 中文到英文的映射
+        case "${{ github.event.inputs.build_strategy || '混合模式' }}" in
+          "构建时下载") STRATEGY="build-time" ;;
+          "运行时下载") STRATEGY="runtime" ;;
+          "混合模式") STRATEGY="hybrid" ;;
+          "本地模式") STRATEGY="local" ;;
+          *) STRATEGY="hybrid" ;;
+        esac
+
+        case "${{ github.event.inputs.ytdlp_source || 'GitHub发布版' }}" in
+          "GitHub发布版") YTDLP_SOURCE="github_release" ;;
+          "PyPI官方包") YTDLP_SOURCE="pypi" ;;
+          "本地文件") YTDLP_SOURCE="local" ;;
+          *) YTDLP_SOURCE="github_release" ;;
+        esac
+
+        case "${{ github.event.inputs.environment || '生产环境' }}" in
+          "开发环境") ENVIRONMENT="development" ;;
+          "生产环境") ENVIRONMENT="production" ;;
+          "测试环境") ENVIRONMENT="testing" ;;
+          *) ENVIRONMENT="production" ;;
+        esac
+
         YTDLP_VERSION="${{ github.event.inputs.ytdlp_version || 'latest' }}"
-        ENVIRONMENT="${{ github.event.inputs.environment || 'production' }}"
 
         echo "🔧 配置构建策略: $STRATEGY"
         echo "📦 yt-dlp 源: $YTDLP_SOURCE"
@@ -111,24 +131,28 @@ jobs:
             echo "requirements=requirements/requirements.github.txt" >> $GITHUB_OUTPUT
             echo "start_script=scripts/start.sh" >> $GITHUB_OUTPUT
             echo "image_suffix=build-time" >> $GITHUB_OUTPUT
+            echo "strategy_chinese=构建时下载" >> $GITHUB_OUTPUT
             ;;
           "runtime")
             echo "dockerfile=dockerfiles/Dockerfile.runtime" >> $GITHUB_OUTPUT
             echo "requirements=requirements/requirements.runtime.txt" >> $GITHUB_OUTPUT
             echo "start_script=scripts/start-runtime.sh" >> $GITHUB_OUTPUT
             echo "image_suffix=runtime" >> $GITHUB_OUTPUT
+            echo "strategy_chinese=运行时下载" >> $GITHUB_OUTPUT
             ;;
           "hybrid")
             echo "dockerfile=dockerfiles/Dockerfile.hybrid" >> $GITHUB_OUTPUT
             echo "requirements=requirements/requirements.hybrid.txt" >> $GITHUB_OUTPUT
             echo "start_script=scripts/start-hybrid.sh" >> $GITHUB_OUTPUT
             echo "image_suffix=hybrid" >> $GITHUB_OUTPUT
+            echo "strategy_chinese=混合模式" >> $GITHUB_OUTPUT
             ;;
           "local")
             echo "dockerfile=dockerfiles/Dockerfile.local-ytdlp" >> $GITHUB_OUTPUT
             echo "requirements=requirements/requirements.local.txt" >> $GITHUB_OUTPUT
             echo "start_script=scripts/start.sh" >> $GITHUB_OUTPUT
             echo "image_suffix=local" >> $GITHUB_OUTPUT
+            echo "strategy_chinese=本地模式" >> $GITHUB_OUTPUT
             ;;
           *)
             echo "❌ 不支持的构建策略: $STRATEGY"
