@@ -957,6 +957,7 @@
         async function displayUserInfo() {
             try {
                 const token = localStorage.getItem('auth_token');
+                console.log('Token found:', !!token);
                 if (!token) return;
 
                 const response = await fetch('/api/auth/verify', {
@@ -965,12 +966,19 @@
                     }
                 });
 
+                console.log('Auth verify response:', response.status);
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('Auth data:', data);
                     if (data.valid && data.username) {
                         // 在页面头部添加用户信息和登出按钮
+                        console.log('Adding user controls for:', data.username);
                         addUserControls(data.username);
+                    } else {
+                        console.warn('Invalid auth data or missing username');
                     }
+                } else {
+                    console.warn('Auth verify failed:', response.status);
                 }
             } catch (error) {
                 console.error('Failed to get user info:', error);
@@ -980,7 +988,17 @@
         // 添加用户控制区域
         function addUserControls(username) {
             const header = document.querySelector('.header');
+            console.log('Header element found:', !!header);
+
+            // 检查是否已经存在用户控制区域
+            const existingControls = header?.querySelector('[data-user-controls]');
+            if (existingControls) {
+                console.log('Removing existing user controls');
+                existingControls.remove();
+            }
+
             const userControls = document.createElement('div');
+            userControls.setAttribute('data-user-controls', 'true');
             userControls.style.cssText = `
                 position: absolute;
                 top: 20px;
@@ -1023,7 +1041,16 @@
                 </button>
             `;
 
-            header.appendChild(userControls);
+            if (header) {
+                header.appendChild(userControls);
+                console.log('User controls added successfully');
+
+                // 验证按钮是否正确添加
+                const configButton = userControls.querySelector('button[onclick*="admin"]');
+                console.log('Config button found:', !!configButton);
+            } else {
+                console.error('Header element not found, cannot add user controls');
+            }
         }
 
         // 登出功能

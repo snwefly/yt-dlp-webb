@@ -14,13 +14,32 @@ from flask import Flask, request, jsonify, render_template, send_from_directory,
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from yt_dlp import YoutubeDL
 from .file_cleaner import initialize_cleanup_manager, get_cleanup_manager
 from .auth import auth_manager, login_required, admin_required, get_current_user
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# 设置环境变量以禁用懒加载，避免运行时导入错误
+import os
+os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
+
+# 预加载 yt-dlp extractors 以避免运行时导入错误
+try:
+    from yt_dlp.extractor import import_extractors
+    import_extractors()
+    logger.info("Successfully preloaded yt-dlp extractors")
+except Exception as e:
+    logger.warning(f"Failed to preload extractors: {e}")
+    # 尝试手动导入一些常用的 extractors
+    try:
+        from yt_dlp.extractor.youtube import YoutubeIE
+        from yt_dlp.extractor.generic import GenericIE
+        logger.info("Successfully imported basic extractors")
+    except Exception as e2:
+        logger.error(f"Failed to import basic extractors: {e2}")
 
 
 class DownloadManager:
