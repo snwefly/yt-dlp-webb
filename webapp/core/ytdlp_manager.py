@@ -24,6 +24,8 @@ class YtdlpManager:
         try:
             # 设置环境变量
             os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
+            # 设置更宽松的导入策略
+            os.environ['YTDLP_IGNORE_EXTRACTOR_ERRORS'] = '1'
 
             logger.info("🔍 初始化 yt-dlp...")
 
@@ -51,6 +53,10 @@ class YtdlpManager:
                     'extract_flat': True,
                 })
                 logger.info("✅ yt-dlp 实例测试成功")
+
+                # 测试实例是否能正常工作
+                test_ydl.close()
+
             except Exception as e:
                 logger.warning(f"⚠️ yt-dlp 实例测试失败: {e}")
                 # 仍然标记为可用，但使用更保守的配置
@@ -69,9 +75,11 @@ class YtdlpManager:
 
     def _preload_common_extractors(self):
         """预加载常见的缺失 extractor"""
+        # 移除非标准提取器，只保留确实存在但可能有导入问题的标准提取器
         common_missing = [
-            'screencastify', 'screen9', 'screencast', 'screencastomatic',
-            'screenrec', 'scribd', 'scrolller', 'scte', 'sendtonews'
+            # 注释掉非标准提取器，避免与 yt-dlp 内部机制冲突
+            # 'screencastify', 'screen9', 'screencast', 'screencastomatic',
+            # 'screenrec', 'scribd', 'scrolller', 'scte', 'sendtonews'
         ]
 
         for extractor_name in common_missing:
@@ -80,37 +88,19 @@ class YtdlpManager:
                 module_name = f'yt_dlp.extractor.{extractor_name}'
                 __import__(module_name)
             except ImportError:
-                self._fix_missing_extractor(extractor_name)
+                logger.debug(f"⚠️ 跳过非标准 extractor: {extractor_name}")
+                # 不再尝试修复非标准提取器
+                # self._fix_missing_extractor(extractor_name)
 
     def _run_extractor_fix(self):
         """运行 extractor 修复"""
         try:
-            # 首先预加载常见的缺失 extractor
+            # 首先预加载常见的缺失 extractor（现在是空列表，不做任何操作）
             self._preload_common_extractors()
 
-            import subprocess
-            import sys
+            # 不再运行可能有问题的修复脚本，避免与 yt-dlp 内部机制冲突
+            logger.debug("ℹ️ 跳过 extractor 修复脚本，使用 yt-dlp 原生机制")
 
-            # 尝试运行修复脚本
-            fix_script = "/app/scripts/fix_extractors.py"
-            if os.path.exists(fix_script):
-                logger.debug("🔧 运行 extractor 修复脚本...")
-                result = subprocess.run([sys.executable, fix_script],
-                                      capture_output=True, text=True, timeout=30)
-                if result.returncode == 0:
-                    logger.debug("✅ extractor 修复成功")
-                else:
-                    # 只在调试模式下显示详细错误
-                    logger.debug(f"⚠️ extractor 修复失败: {result.stderr}")
-                    # 检查是否是版本错误，如果是则忽略
-                    if "__version__" in result.stderr:
-                        logger.debug("ℹ️ extractor 修复脚本版本检测问题，但不影响功能")
-                    else:
-                        logger.warning("⚠️ extractor 修复失败，但不影响核心功能")
-            else:
-                logger.debug("ℹ️ extractor 修复脚本不存在，跳过修复")
-        except subprocess.TimeoutExpired:
-            logger.debug("⚠️ extractor 修复超时，跳过")
         except Exception as e:
             logger.debug(f"⚠️ extractor 修复过程出错: {e}")
 
@@ -180,6 +170,8 @@ class YtdlpManager:
                 'ignoreerrors': True,  # 忽略单个 extractor 错误
                 'no_check_certificate': True,  # 忽略证书错误
                 'extract_flat': False,  # 完整提取
+                'ignore_no_formats_error': True,  # 忽略格式错误
+                'ignore_config': True,  # 忽略配置文件
             }
 
             if options:
@@ -187,36 +179,47 @@ class YtdlpManager:
 
             # 尝试创建下载器，如果失败则使用最小配置
             try:
-                return YoutubeDL(default_options)
-            except ImportError as ie:
-                error_msg = str(ie)
-                if 'extractor' in error_msg:
-                    logger.warning(f"⚠️ extractor 导入警告: {ie}")
+                downloader = YoutubeDL(default_options)
+                logger.debug("✅ 下载器创建成功")
+                return downloader
+            except Exception as e:
+                error_msg = str(e)
+                logger.warning(f"⚠️ 下载器创建失败: {e}")
 
-                    # 尝试提取缺失的 extractor 名称
-                    if "No module named 'yt_dlp.extractor." in error_msg:
-                        extractor_name = error_msg.split("'yt_dlp.extractor.")[1].split("'")[0]
-                        logger.info(f"🔧 尝试动态修复缺失的 extractor: {extractor_name}")
+                # 不再尝试修复非标准提取器，直接使用最小配置
+                logger.info("🔄 使用最小配置重试创建下载器...")
+                minimal_options = {
+                    'quiet': True,
+                    'no_warnings': True,
+                    'ignoreerrors': True,
+                    'extract_flat': True,  # 使用平面提取避免复杂 extractor
+                    'ignore_no_formats_error': True,
+                    'ignore_config': True,
+                }
+                if options:
+                    # 只保留关键选项
+                    safe_options = {k: v for k, v in options.items()
+                                  if k in ['outtmpl', 'format', 'writesubtitles', 'writeautomaticsub']}
+                    minimal_options.update(safe_options)
 
-                        if self._fix_missing_extractor(extractor_name):
-                            # 重试创建下载器
-                            try:
-                                return YoutubeDL(default_options)
-                            except Exception:
-                                pass  # 如果还是失败，继续使用最小配置
+                downloader = YoutubeDL(minimal_options)
+                logger.info("✅ 最小配置下载器创建成功")
+                return downloader
+            except Exception as e:
+                logger.warning(f"⚠️ 标准配置下载器创建失败: {e}")
 
-                    # 使用最小配置重试
-                    minimal_options = {
-                        'quiet': True,
-                        'no_warnings': True,
-                        'ignoreerrors': True,
-                        'extract_flat': True,  # 使用平面提取避免复杂 extractor
-                    }
-                    if options:
-                        minimal_options.update(options)
-                    return YoutubeDL(minimal_options)
-                else:
-                    raise
+                # 最后尝试：超级最小配置
+                logger.info("🔄 使用超级最小配置重试...")
+                ultra_minimal_options = {
+                    'quiet': True,
+                    'ignoreerrors': True,
+                }
+                if options and 'outtmpl' in options:
+                    ultra_minimal_options['outtmpl'] = options['outtmpl']
+
+                downloader = YoutubeDL(ultra_minimal_options)
+                logger.info("✅ 超级最小配置下载器创建成功")
+                return downloader
 
         except Exception as e:
             logger.error(f"❌ 创建下载器失败: {e}")

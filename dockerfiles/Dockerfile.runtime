@@ -55,6 +55,9 @@ COPY webapp /app/webapp
 COPY scripts /app/scripts
 COPY config /app/config
 
+# 复制环境配置文件
+COPY .env* /app/
+
 # 只复制运行时模式需要的启动脚本
 COPY scripts/start-runtime.sh /app/start.sh
 
@@ -67,12 +70,15 @@ RUN dos2unix /app/start.sh && \
     mkdir -p /home/ytdlp && \
     chown -R ytdlp:ytdlp /home/ytdlp && \
     chmod 755 /home/ytdlp && \
-    # 设置应用目录权限
+    # 设置应用目录权限 - 更宽松的权限设置
     chown -R ytdlp:ytdlp /app && \
     chmod -R 755 /app && \
+    # 为关键目录设置更宽松的权限，确保写入成功
     chmod 777 /app/downloads /app/logs /app/yt-dlp-cache && \
     chown ytdlp:ytdlp /app/downloads /app/logs /app/yt-dlp-cache && \
-    echo "✅ 运行时下载模式配置完成"
+    # 测试写入权限
+    su ytdlp -c "touch /app/downloads/.test_write && rm /app/downloads/.test_write" && \
+    echo "✅ 运行时下载模式配置完成，权限测试通过"
 
 # 切换用户
 USER ytdlp

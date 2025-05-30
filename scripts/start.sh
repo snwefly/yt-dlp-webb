@@ -3,12 +3,31 @@
 # yt-dlp Web界面启动脚本
 echo "🚀 启动 yt-dlp Web界面..."
 
-# 设置默认环境变量
+# 处理环境变量文件
+echo "🔧 处理环境变量配置..."
+if [ -f "/app/.env" ]; then
+    echo "✅ 发现 .env 文件"
+    # 导出环境变量（过滤注释和空行）
+    set -a
+    source /app/.env 2>/dev/null || true
+    set +a
+elif [ -f "/app/.env.example" ]; then
+    echo "⚠️ 未找到 .env 文件，使用 .env.example"
+    cp /app/.env.example /app/.env
+    set -a
+    source /app/.env 2>/dev/null || true
+    set +a
+else
+    echo "⚠️ 未找到环境变量文件，使用默认配置"
+fi
+
+# 设置默认环境变量（如果没有从 .env 文件中加载）
 export ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
 export ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
 export SECRET_KEY=${SECRET_KEY:-dev-key-change-in-production}
 export DOWNLOAD_FOLDER=${DOWNLOAD_FOLDER:-/app/downloads}
 export YTDLP_NO_LAZY_EXTRACTORS=1
+export YTDLP_IGNORE_EXTRACTOR_ERRORS=1
 
 # 创建必要的目录并设置权限
 echo "🔧 创建并设置目录权限..."

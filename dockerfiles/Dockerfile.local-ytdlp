@@ -55,6 +55,9 @@ COPY scripts /app/scripts
 COPY config /app/config
 COPY yt_dlp /app/yt_dlp
 
+# 复制环境配置文件
+COPY .env* /app/
+
 # 只复制本地模式需要的启动脚本
 COPY scripts/start.sh /app/start.sh
 

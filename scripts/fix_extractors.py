@@ -17,13 +17,14 @@ def check_missing_extractors():
     missing_extractors = []
 
     try:
-        # 尝试导入常见的 extractors
+        # 移除非标准提取器，避免与 yt-dlp 内部机制冲突
         test_extractors = [
-            'screencastify',
-            'screen9',
-            'screencast',
-            'screencastomatic',
-            'screenrec'
+            # 注释掉非标准提取器
+            # 'screencastify',
+            # 'screen9',
+            # 'screencast',
+            # 'screencastomatic',
+            # 'screenrec'
         ]
 
         for extractor_name in test_extractors:

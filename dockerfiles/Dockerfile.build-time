@@ -92,6 +92,9 @@ COPY webapp /app/webapp
 COPY scripts /app/scripts
 COPY config /app/config
 
+# 复制环境配置文件
+COPY .env* /app/
+
 # 只复制构建时模式需要的启动脚本
 COPY scripts/start.sh /app/start.sh
 

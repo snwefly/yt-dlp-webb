@@ -26,22 +26,50 @@ echo "   yt-dlp 源: ${YTDLP_SOURCE:-github_release}"
 echo "   yt-dlp 版本: ${YTDLP_VERSION:-latest}"
 echo "==========================================="
 
+# 处理环境变量文件
+log_info "处理环境变量配置..."
+if [ -f "/app/.env" ]; then
+    log_success "发现 .env 文件"
+    # 导出环境变量（过滤注释和空行）
+    set -a
+    source /app/.env 2>/dev/null || true
+    set +a
+elif [ -f "/app/.env.example" ]; then
+    log_warning "未找到 .env 文件，使用 .env.example"
+    cp /app/.env.example /app/.env
+    set -a
+    source /app/.env 2>/dev/null || true
+    set +a
+else
+    log_warning "未找到环境变量文件，使用默认配置"
+fi
+
 # 设置环境变量
 export PYTHONPATH="/app:$PYTHONPATH"
 export YTDLP_NO_LAZY_EXTRACTORS=1
+export YTDLP_IGNORE_EXTRACTOR_ERRORS=1
 
 # 创建必要目录
 log_info "创建必要目录..."
 mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache
 
-# 检查权限
+# 检查和修复权限
 log_info "检查目录权限..."
-if [ -w "/app/downloads" ]; then
-    log_success "下载目录权限正常"
-else
-    log_warning "下载目录权限不足，尝试修复..."
-    chmod 755 /app/downloads 2>/dev/null || true
-fi
+for dir in "/app/downloads" "/app/logs" "/app/yt-dlp-cache"; do
+    if [ ! -w "$dir" ]; then
+        log_warning "目录 $dir 权限不足，尝试修复..."
+        chmod 755 "$dir" 2>/dev/null || true
+        # 如果还是不行，尝试创建测试文件
+        if ! touch "$dir/.write_test" 2>/dev/null; then
+            log_error "无法写入目录 $dir"
+        else
+            rm -f "$dir/.write_test"
+            log_success "目录 $dir 权限修复成功"
+        fi
+    else
+        log_success "目录 $dir 权限正常"
+    fi
+done
 
 # 使用通用 yt-dlp 安装脚本
 log_info "🔧 安装和验证 yt-dlp..."
