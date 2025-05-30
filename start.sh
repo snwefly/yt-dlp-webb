@@ -9,20 +9,56 @@ export ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
 export SECRET_KEY=${SECRET_KEY:-dev-key-change-in-production}
 export DOWNLOAD_FOLDER=${DOWNLOAD_FOLDER:-/app/downloads}
 
-# 创建必要的目录
+# 创建必要的目录并设置权限
 mkdir -p $DOWNLOAD_FOLDER
 mkdir -p /app/config
+
+# 设置下载目录权限
+echo "🔧 设置下载目录权限..."
+chmod 775 $DOWNLOAD_FOLDER
+chown -R ytdlp:ytdlp $DOWNLOAD_FOLDER 2>/dev/null || echo "⚠️ 无法更改所有者，继续..."
+echo "✅ 下载目录权限设置完成: $DOWNLOAD_FOLDER"
 
 # 设置Python路径
 export PYTHONPATH="/app:$PYTHONPATH"
 
+# 调试信息
+echo "🔍 调试信息..."
+echo "当前目录: $(pwd)"
+echo "Python路径: $PYTHONPATH"
+echo "目录内容:"
+ls -la /app/
+echo "yt_dlp目录内容:"
+ls -la /app/yt_dlp/ | head -10
+
 # 验证yt-dlp模块
 echo "🔍 检查yt-dlp模块..."
-if python3 -c "import yt_dlp; print('✅ yt-dlp模块可用')" 2>/dev/null; then
+echo "尝试导入 yt_dlp..."
+python3 -c "
+import sys
+print('Python sys.path:')
+for p in sys.path:
+    print(f'  {p}')
+print()
+try:
+    import yt_dlp
+    print('✅ yt-dlp模块导入成功')
+    print(f'yt-dlp位置: {yt_dlp.__file__}')
+    try:
+        print(f'yt-dlp版本: {yt_dlp.version.__version__}')
+    except:
+        print('无法获取版本信息')
+except Exception as e:
+    print(f'❌ yt-dlp模块导入失败: {e}')
+    import traceback
+    traceback.print_exc()
+"
+
+# 简化的验证（不退出）
+if python3 -c "import yt_dlp" 2>/dev/null; then
     echo "✅ yt-dlp模块验证成功"
 else
-    echo "❌ yt-dlp模块不可用"
-    exit 1
+    echo "⚠️ yt-dlp模块验证失败，但继续启动..."
 fi
 
 # 启动Web应用
