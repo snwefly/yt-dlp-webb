@@ -76,28 +76,24 @@ try:
     except Exception as e:
         print(f'❌ 基础 extractors 导入失败: {e}')
 
-    # 测试 YoutubeDL 实例创建
+    # 测试 YoutubeDL 实例创建（简化版）
     try:
         from yt_dlp import YoutubeDL
-        ydl = YoutubeDL({'quiet': True, 'no_warnings': True})
+        ydl = YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': True})
         print('✅ YoutubeDL 实例创建成功')
     except Exception as e:
-        print(f'❌ YoutubeDL 实例创建失败: {e}')
+        print(f'⚠️ YoutubeDL 实例创建失败: {e}')
+        print('⚠️ 继续启动，运行时将重新尝试')
 
-    # 尝试 import_extractors（可选）
+    # 测试基础 extractors（非阻塞）
     try:
-        from yt_dlp.extractor import import_extractors
-        import_extractors()
-        print('✅ import_extractors 执行成功')
+        from yt_dlp.extractor.youtube import YoutubeIE
+        from yt_dlp.extractor.generic import GenericIE
+        print('✅ 基础 extractors (YouTube, Generic) 导入成功')
     except Exception as e:
-        print(f'⚠️ import_extractors 失败（但基础功能可用）: {e}')
+        print(f'⚠️ 基础 extractors 导入失败: {e}')
 
-    # 测试特定的 extractor（非阻塞）
-    try:
-        from yt_dlp.extractor.screen9 import Screen9IE
-        print('✅ screen9 extractor 导入成功')
-    except Exception as e:
-        print(f'⚠️ screen9 extractor 导入失败（预期行为）: {e}')
+    print('✅ yt-dlp 基础测试完成')
 
 except Exception as e:
     print(f'❌ yt-dlp模块导入失败: {e}')

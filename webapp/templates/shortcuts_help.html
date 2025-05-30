@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS快捷指令使用指南</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .shortcut-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .shortcut-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .shortcut-card .icon {
+            font-size: 2em;
+            margin-right: 10px;
+        }
+
+        .steps {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+
+        .steps ol {
+            padding-left: 20px;
+        }
+
+        .steps li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 15px;
+            transition: transform 0.3s;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .note {
+            background: #e8f4fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            color: #667eea;
+        }
+
+        .back-btn {
+            background: #95a5a6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 iOS快捷指令使用指南</h1>
+            <p>一键安装，在iPhone/iPad上直接下载视频</p>
+        </div>
+
+        <div class="content">
+            <a href="/" class="back-btn">← 返回主页</a>
+
+            <div class="section">
+                <h2>🚀 快速开始</h2>
+                <div class="note">
+                    <strong>📋 安装步骤：</strong>
+                    <ol style="margin-top: 10px;">
+                        <li>点击下方快捷指令的"下载"按钮</li>
+                        <li>在弹出的页面中选择"用快捷指令打开"</li>
+                        <li>点击"添加快捷指令"完成安装</li>
+                        <li>复制视频链接，运行快捷指令即可下载</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📥 可用的快捷指令</h2>
+
+                <div class="shortcut-card">
+                    <h3><span class="icon">🎬</span>智能视频下载器</h3>
+                    <p>支持格式选择的交互式下载器，可以选择视频质量和音频格式。</p>
+                    <div class="steps">
+                        <strong>使用步骤：</strong>
+                        <ol>
+                            <li>复制视频链接到剪贴板</li>
+                            <li>运行"智能视频下载器"快捷指令</li>
+                            <li>从菜单中选择下载格式（最佳质量、720P、MP3等）</li>
+                            <li>等待下载完成，文件自动保存到相册或文件app</li>
+                        </ol>
+                    </div>
+                    <a href="/api/shortcuts/download-file/smart_downloader" class="download-btn">📥 下载快捷指令</a>
+                </div>
+
+                <div class="shortcut-card">
+                    <h3><span class="icon">🎵</span>音频提取器</h3>
+                    <p>专门提取视频中的音频，输出高品质MP3格式。</p>
+                    <div class="steps">
+                        <strong>使用步骤：</strong>
+                        <ol>
+                            <li>复制视频链接</li>
+                            <li>运行"音频提取器"快捷指令</li>
+                            <li>等待提取完成</li>
+                            <li>音频文件保存到iCloud Drive/Downloads</li>
+                        </ol>
+                    </div>
+                    <a href="/api/shortcuts/download-file/audio_extractor" class="download-btn">📥 下载快捷指令</a>
+                </div>
+
+                <div class="shortcut-card">
+                    <h3><span class="icon">📱</span>720P下载器</h3>
+                    <p>专门下载720P高清视频，适合手机观看，文件大小适中。</p>
+                    <div class="steps">
+                        <strong>使用步骤：</strong>
+                        <ol>
+                            <li>复制视频链接</li>
+                            <li>运行"720P下载器"快捷指令</li>
+                            <li>等待下载完成</li>
+                            <li>视频保存到相册</li>
+                        </ol>
+                    </div>
+                    <a href="/api/shortcuts/download-file/720p_downloader" class="download-btn">📥 下载快捷指令</a>
+                </div>
+
+                <div class="shortcut-card">
+                    <h3><span class="icon">⚡</span>批量下载器</h3>
+                    <p>支持多个视频链接批量下载，适合下载播放列表或多个视频。</p>
+                    <div class="steps">
+                        <strong>使用步骤：</strong>
+                        <ol>
+                            <li>准备多个视频链接（每行一个）</li>
+                            <li>运行"批量下载器"快捷指令</li>
+                            <li>输入或粘贴链接列表</li>
+                            <li>选择下载格式</li>
+                            <li>等待所有下载完成</li>
+                        </ol>
+                    </div>
+                    <a href="/api/shortcuts/download-file/batch_downloader" class="download-btn">📥 下载快捷指令</a>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>⚙️ 服务器配置</h2>
+                <div class="warning">
+                    <strong>⚠️ 重要提醒：</strong><br>
+                    下载的快捷指令中包含服务器地址 <code>YOUR_SERVER_IP:8080</code>，需要手动替换为您的实际服务器地址。
+                </div>
+                
+                <div class="steps">
+                    <strong>配置步骤：</strong>
+                    <ol>
+                        <li>安装快捷指令后，点击快捷指令进行编辑</li>
+                        <li>找到"获取网页内容"动作</li>
+                        <li>将URL中的 <code>YOUR_SERVER_IP</code> 替换为实际IP地址</li>
+                        <li>例如：<code>http://192.168.1.100:8080/api/shortcuts/download-direct</code></li>
+                        <li>保存快捷指令</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>💡 使用技巧</h2>
+                <div class="note">
+                    <ul style="margin-top: 10px;">
+                        <li><strong>Siri语音控制：</strong> 可以为快捷指令添加Siri短语，如"下载视频"</li>
+                        <li><strong>分享菜单：</strong> 在Safari中可以通过分享菜单直接调用快捷指令</li>
+                        <li><strong>主屏幕快捷方式：</strong> 可以将快捷指令添加到主屏幕</li>
+                        <li><strong>批量处理：</strong> 使用批量下载器可以一次处理多个视频</li>
+                        <li><strong>格式选择：</strong> 根据需要选择合适的视频质量和音频格式</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>❓ 常见问题</h2>
+                
+                <div class="shortcut-card">
+                    <h3>Q: 快捷指令无法下载怎么办？</h3>
+                    <p>A: 请检查：</p>
+                    <ul>
+                        <li>服务器地址是否正确配置</li>
+                        <li>网络连接是否正常</li>
+                        <li>视频链接是否有效</li>
+                        <li>设备存储空间是否充足</li>
+                    </ul>
+                </div>
+
+                <div class="shortcut-card">
+                    <h3>Q: 下载的视频没有声音？</h3>
+                    <p>A: 我们的配置确保下载的视频包含音频。如果遇到无声音问题，可能是：</p>
+                    <ul>
+                        <li>原视频本身没有音频</li>
+                        <li>选择了"仅音频"选项</li>
+                        <li>网络问题导致下载不完整</li>
+                    </ul>
+                </div>
+
+                <div class="shortcut-card">
+                    <h3>Q: 支持哪些网站？</h3>
+                    <p>A: 支持yt-dlp兼容的所有网站，包括但不限于：</p>
+                    <ul>
+                        <li>YouTube</li>
+                        <li>Bilibili</li>
+                        <li>Twitter</li>
+                        <li>Instagram</li>
+                        <li>TikTok</li>
+                        <li>以及数千个其他网站</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
