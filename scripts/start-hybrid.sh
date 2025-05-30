@@ -54,89 +54,27 @@ else
     log_warning "未找到构建时状态文件"
 fi
 
-# 根据构建时状态决定策略
-case $BUILD_STATUS in
-    "build_time_success")
-        log_success "构建时下载成功，使用构建时的 yt-dlp"
-        
-        # 检查构建时下载的文件
-        if [ -d "/app/yt-dlp-source/yt_dlp" ]; then
-            export PYTHONPATH="/app/yt-dlp-source:$PYTHONPATH"
-            log_success "使用构建时下载的 yt-dlp"
-        else
-            log_warning "构建时文件不完整，切换到运行时下载"
-            BUILD_STATUS="build_time_failed"
-        fi
-        ;;
-        
-    "build_time_failed"|*)
-        log_warning "构建时下载失败或未知状态，运行时重新下载..."
-        
-        # 运行时下载
-        if [ -f "/app/scripts/ytdlp_source_manager.py" ]; then
-            log_info "使用源管理器运行时下载..."
-            cd /app
-            
-            if python scripts/ytdlp_source_manager.py \
-                --config config/ytdlp-source.yml \
-                --target /app/yt-dlp-runtime; then
-                
-                log_success "运行时下载成功"
-                export PYTHONPATH="/app/yt-dlp-runtime:$PYTHONPATH"
-            else
-                log_warning "源管理器下载失败，尝试 pip 安装..."
-                
-                # 最后回退到 pip
-                YTDLP_VERSION=${YTDLP_VERSION:-"latest"}
-                if [ "$YTDLP_VERSION" = "latest" ]; then
-                    pip install --no-cache-dir yt-dlp
-                else
-                    pip install --no-cache-dir "yt-dlp==$YTDLP_VERSION"
-                fi
-                
-                log_success "pip 安装成功"
-            fi
-        else
-            log_warning "源管理器不存在，使用 pip 安装..."
-            
-            # 直接 pip 安装
-            YTDLP_VERSION=${YTDLP_VERSION:-"latest"}
-            if [ "$YTDLP_VERSION" = "latest" ]; then
-                pip install --no-cache-dir yt-dlp
-            else
-                pip install --no-cache-dir "yt-dlp==$YTDLP_VERSION"
-            fi
-            
-            log_success "pip 安装成功"
-        fi
-        ;;
-esac
+# 使用通用 yt-dlp 安装脚本
+log_info "🔧 安装和验证 yt-dlp..."
+if [ -f "/app/scripts/ytdlp_installer.sh" ]; then
+    source /app/scripts/ytdlp_installer.sh
 
-# 验证 yt-dlp 安装
-log_info "🔍 验证 yt-dlp 安装..."
-python -c "
-import sys
-sys.path.insert(0, '/app')
-try:
-    import yt_dlp
-    print('✅ yt-dlp 导入成功')
-    print(f'yt-dlp 版本: {yt_dlp.__version__}')
-    print(f'yt-dlp 位置: {yt_dlp.__file__}')
-    
-    # 测试创建实例
-    ydl = yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'ignoreerrors': True})
-    print('✅ yt-dlp 实例创建成功')
-except Exception as e:
-    print(f'❌ yt-dlp 验证失败: {e}')
-    sys.exit(1)
-"
+    # 混合模式
+    if ! install_ytdlp "hybrid" "${YTDLP_VERSION:-latest}"; then
+        log_error "yt-dlp 安装失败"
+        exit 1
+    fi
 
-if [ $? -eq 0 ]; then
-    log_success "yt-dlp 验证通过"
+    if ! verify_installation; then
+        log_error "yt-dlp 验证失败"
+        exit 1
+    fi
 else
-    log_error "yt-dlp 验证失败"
+    log_error "yt-dlp 安装脚本不存在"
     exit 1
 fi
+
+
 
 # 运行 extractor 修复（如果需要）
 if [ -f "/app/scripts/fix_extractors.py" ]; then

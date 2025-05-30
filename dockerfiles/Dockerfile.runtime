@@ -61,10 +61,12 @@ COPY scripts/start-runtime.sh /app/start.sh
 # 设置权限
 RUN dos2unix /app/start.sh && \
     chmod +x /app/start.sh && \
+    chmod +x /app/scripts/*.sh && \
     mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
     chown -R ytdlp:ytdlp /app && \
     chmod -R 755 /app && \
-    chmod 777 /app/downloads && \
+    chmod 777 /app/downloads /app/logs /app/yt-dlp-cache && \
+    chown ytdlp:ytdlp /app/downloads /app/logs /app/yt-dlp-cache && \
     echo "✅ 运行时下载模式配置完成"
 
 # 切换用户

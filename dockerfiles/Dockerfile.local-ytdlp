@@ -51,16 +51,23 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件（包含本地yt-dlp）
 COPY webapp /app/webapp
+COPY scripts /app/scripts
+COPY config /app/config
 COPY yt_dlp /app/yt_dlp
-COPY start.sh /app/start.sh
+
+# 只复制本地模式需要的启动脚本
+COPY scripts/start.sh /app/start.sh
 
 # 设置启动脚本权限并创建目录
 RUN dos2unix /app/start.sh && \
     chmod +x /app/start.sh && \
-    mkdir -p /app/downloads /app/config /app/logs && \
+    chmod +x /app/scripts/*.sh && \
+    mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
     chown -R ytdlp:ytdlp /app && \
     chmod -R 755 /app && \
-    echo "✅ 文件和权限设置完成"
+    chmod 777 /app/downloads /app/logs /app/yt-dlp-cache && \
+    chown ytdlp:ytdlp /app/downloads /app/logs /app/yt-dlp-cache && \
+    echo "✅ 本地模式配置完成"
 
 # 切换到非root用户
 USER ytdlp

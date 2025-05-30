@@ -17,3 +17,12 @@ certifi>=2023.11.17
 
 # Development and debugging
 gunicorn>=21.2.0
+
+# 源管理依赖
+pyyaml>=6.0
+
+# 系统监控
+psutil>=5.9.0
+
+# 注意：本地模式使用项目中的 yt_dlp 目录，不通过 pip 安装 yt-dlp
+# 如果本地 yt_dlp 文件不可用，启动脚本会自动回退到 pip 安装
