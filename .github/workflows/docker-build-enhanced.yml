@@ -252,8 +252,8 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: ${{ needs.prepare.outputs.build_args }}
-        cache-from: type=gha,scope=${{ github.event.inputs.build_strategy || 'hybrid' }}
-        cache-to: type=gha,mode=max,scope=${{ github.event.inputs.build_strategy || 'hybrid' }}
+        cache-from: type=gha,scope=${{ needs.prepare.outputs.image_suffix }}
+        cache-to: type=gha,mode=max,scope=${{ needs.prepare.outputs.image_suffix }}
 
     - name: 构建结果摘要
       run: |
@@ -290,13 +290,16 @@ jobs:
         platforms: linux/amd64
         push: false
         tags: test-image:latest
+        load: true
         build-args: ${{ needs.prepare.outputs.build_args }}
-        cache-from: type=gha,scope=${{ github.event.inputs.build_strategy || 'hybrid' }}
+        cache-from: type=gha,scope=${{ needs.prepare.outputs.image_suffix }}
 
     - name: 运行容器测试
       run: |
-        echo "🧪 启动测试容器..."
+        echo "🔍 验证测试镜像..."
+        docker images
 
+        echo "🧪 启动测试容器..."
         # 启动容器
         docker run -d --name test-container \
           -p 8080:8080 \
