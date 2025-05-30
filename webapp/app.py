@@ -28,50 +28,77 @@ os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
 
 # 预加载 yt-dlp extractors 以避免运行时导入错误
 def _preload_extractors():
-    """预加载 yt-dlp extractors"""
+    """预加载 yt-dlp extractors（安全模式）"""
     try:
-        # 强制禁用懒加载
+        # 确保环境变量设置
         import os
+        import sys
+
+        # 确保项目路径优先
+        if '/app' not in sys.path:
+            sys.path.insert(0, '/app')
+
+        # 强制禁用懒加载
         os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
 
-        # 尝试导入 extractors 模块
-        from yt_dlp.extractor import extractors
-        logger.info("✅ extractors 模块导入成功")
+        logger.info("🔍 开始预加载 yt-dlp extractors...")
 
-        # 尝试导入基础 extractors
-        from yt_dlp.extractor.youtube import YoutubeIE
-        from yt_dlp.extractor.generic import GenericIE
-        logger.info("✅ 基础 extractors 导入成功")
+        # 步骤1: 测试基础模块导入
+        try:
+            import yt_dlp
+            logger.info(f"✅ yt_dlp 模块导入成功: {yt_dlp.__file__}")
+        except Exception as e:
+            logger.error(f"❌ yt_dlp 模块导入失败: {e}")
+            return False
 
-        # 尝试使用 import_extractors 函数
+        # 步骤2: 测试 YoutubeDL 类
+        try:
+            from yt_dlp import YoutubeDL
+            ydl = YoutubeDL({'quiet': True, 'no_warnings': True})
+            logger.info("✅ YoutubeDL 类创建成功")
+        except Exception as e:
+            logger.error(f"❌ YoutubeDL 类创建失败: {e}")
+            return False
+
+        # 步骤3: 测试基础 extractors（非阻塞）
+        try:
+            from yt_dlp.extractor.youtube import YoutubeIE
+            from yt_dlp.extractor.generic import GenericIE
+            logger.info("✅ 基础 extractors (YouTube, Generic) 导入成功")
+        except Exception as e:
+            logger.warning(f"⚠️ 基础 extractors 导入失败: {e}")
+
+        # 步骤4: 尝试 import_extractors（可选）
         try:
             from yt_dlp.extractor import import_extractors
             import_extractors()
             logger.info("✅ import_extractors 执行成功")
         except Exception as e:
-            logger.warning(f"⚠️ import_extractors 失败，但基础功能可用: {e}")
+            logger.warning(f"⚠️ import_extractors 失败（但不影响基础功能）: {e}")
 
+        logger.info("✅ yt-dlp 预加载完成，基础功能可用")
         return True
 
     except Exception as e:
-        logger.error(f"❌ extractors 预加载失败: {e}")
-        # 尝试最基础的导入
-        try:
-            from yt_dlp import YoutubeDL
-            # 创建一个测试实例来验证基础功能
-            ydl = YoutubeDL({'quiet': True, 'no_warnings': True})
-            logger.info("✅ YoutubeDL 基础功能可用")
-            return True
-        except Exception as e2:
-            logger.error(f"❌ 连基础 YoutubeDL 都无法使用: {e2}")
-            return False
+        logger.error(f"❌ yt-dlp 预加载异常: {e}")
+        import traceback
+        logger.debug(f"预加载异常详情: {traceback.format_exc()}")
+        return False
 
-# 执行预加载
-_preload_success = _preload_extractors()
-if _preload_success:
-    logger.info("✅ yt-dlp 模块预加载完成")
-else:
-    logger.error("❌ yt-dlp 模块预加载失败，可能影响下载功能")
+# 延迟执行预加载（避免模块级别错误）
+def _safe_preload():
+    """安全的预加载执行"""
+    try:
+        success = _preload_extractors()
+        if success:
+            logger.info("✅ yt-dlp 模块预加载完成")
+        else:
+            logger.warning("⚠️ yt-dlp 模块预加载失败，但应用将继续运行")
+    except Exception as e:
+        logger.error(f"❌ 预加载执行异常: {e}")
+
+# 在应用创建时执行预加载
+_preload_executed = False
 
 
 class DownloadManager:
@@ -293,6 +320,16 @@ def _fix_directory_permissions(directory):
         'temp_file_retention_minutes': 30, # 临时文件保留30分钟
     }
     initialize_cleanup_manager(app.config['DOWNLOAD_FOLDER'], cleanup_config)
+
+    # 执行 yt-dlp 预加载（在应用上下文中）
+    with app.app_context():
+        global _preload_executed
+        if not _preload_executed:
+            try:
+                _safe_preload()
+                _preload_executed = True
+            except Exception as e:
+                logger.error(f"预加载执行失败: {e}")
 
     # 注册路由
     register_routes(app)
