@@ -206,7 +206,25 @@ def main():
         # 检查 yt-dlp 是否可用
         try:
             import yt_dlp
-            logger.info(f"✅ yt-dlp 已安装: {yt_dlp.__version__}")
+
+            # 获取版本信息（官方正确方式）
+            version = 'Unknown'
+            try:
+                # 官方正确方式：从 yt_dlp.version 导入
+                from yt_dlp.version import __version__
+                version = __version__
+            except ImportError:
+                try:
+                    # 备用方式1：通过 yt_dlp.version 模块
+                    version = yt_dlp.version.__version__
+                except AttributeError:
+                    try:
+                        # 备用方式2：直接从 yt_dlp（某些旧版本）
+                        version = yt_dlp.__version__
+                    except AttributeError:
+                        pass
+
+            logger.info(f"✅ yt-dlp 已安装: {version}")
         except ImportError:
             logger.error("❌ yt-dlp 未安装")
             return 1

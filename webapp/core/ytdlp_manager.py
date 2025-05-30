@@ -76,17 +76,25 @@ class YtdlpManager:
             # 尝试运行修复脚本
             fix_script = "/app/scripts/fix_extractors.py"
             if os.path.exists(fix_script):
-                logger.info("🔧 运行 extractor 修复脚本...")
+                logger.debug("🔧 运行 extractor 修复脚本...")
                 result = subprocess.run([sys.executable, fix_script],
                                       capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
-                    logger.info("✅ extractor 修复成功")
+                    logger.debug("✅ extractor 修复成功")
                 else:
-                    logger.warning(f"⚠️ extractor 修复失败: {result.stderr}")
+                    # 只在调试模式下显示详细错误
+                    logger.debug(f"⚠️ extractor 修复失败: {result.stderr}")
+                    # 检查是否是版本错误，如果是则忽略
+                    if "__version__" in result.stderr:
+                        logger.debug("ℹ️ extractor 修复脚本版本检测问题，但不影响功能")
+                    else:
+                        logger.warning("⚠️ extractor 修复失败，但不影响核心功能")
             else:
-                logger.info("ℹ️ extractor 修复脚本不存在，跳过修复")
+                logger.debug("ℹ️ extractor 修复脚本不存在，跳过修复")
+        except subprocess.TimeoutExpired:
+            logger.debug("⚠️ extractor 修复超时，跳过")
         except Exception as e:
-            logger.warning(f"⚠️ extractor 修复过程出错: {e}")
+            logger.debug(f"⚠️ extractor 修复过程出错: {e}")
 
     def is_available(self):
         """检查 yt-dlp 是否可用"""

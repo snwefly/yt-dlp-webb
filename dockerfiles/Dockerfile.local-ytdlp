@@ -46,8 +46,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # 复制requirements文件（不包含yt-dlp）
-COPY requirements.local.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements/requirements.local.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # 复制项目文件（包含本地yt-dlp）
 COPY webapp /app/webapp

@@ -16,18 +16,21 @@ try:
     import yt_dlp
     print('✅ yt-dlp 可用')
 
-    # 尝试获取版本信息（多种方式）
+    # 获取版本信息（官方正确方式）
     version = 'Unknown'
     try:
-        version = yt_dlp.version.__version__
-    except:
+        # 官方正确方式：从 yt_dlp.version 导入
+        from yt_dlp.version import __version__
+        version = __version__
+    except ImportError:
         try:
-            version = yt_dlp.__version__
-        except:
+            # 备用方式1：通过 yt_dlp.version 模块
+            version = yt_dlp.version.__version__
+        except AttributeError:
             try:
-                from yt_dlp.version import __version__
-                version = __version__
-            except:
+                # 备用方式2：直接从 yt_dlp（某些旧版本）
+                version = yt_dlp.__version__
+            except AttributeError:
                 pass
 
     print(f'版本: {version}')
