@@ -8,6 +8,7 @@ export ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
 export ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
 export SECRET_KEY=${SECRET_KEY:-dev-key-change-in-production}
 export DOWNLOAD_FOLDER=${DOWNLOAD_FOLDER:-/app/downloads}
+export YTDLP_NO_LAZY_EXTRACTORS=1
 
 # 创建必要的目录并设置权限
 mkdir -p $DOWNLOAD_FOLDER
@@ -36,9 +37,12 @@ echo "🔍 检查yt-dlp模块..."
 echo "尝试导入 yt_dlp..."
 python3 -c "
 import sys
+import os
 print('Python sys.path:')
 for p in sys.path:
     print(f'  {p}')
+print()
+print(f'YTDLP_NO_LAZY_EXTRACTORS: {os.environ.get(\"YTDLP_NO_LAZY_EXTRACTORS\", \"未设置\")}')
 print()
 try:
     import yt_dlp
@@ -48,6 +52,24 @@ try:
         print(f'yt-dlp版本: {yt_dlp.version.__version__}')
     except:
         print('无法获取版本信息')
+
+    # 测试 extractors 导入
+    print('🔍 测试 extractors 导入...')
+    try:
+        from yt_dlp.extractor import import_extractors
+        import_extractors()
+        print('✅ extractors 导入成功')
+
+        # 测试特定的 extractor
+        try:
+            from yt_dlp.extractor.screen9 import Screen9IE
+            print('✅ screen9 extractor 导入成功')
+        except Exception as e:
+            print(f'⚠️ screen9 extractor 导入失败: {e}')
+
+    except Exception as e:
+        print(f'⚠️ extractors 导入失败: {e}')
+
 except Exception as e:
     print(f'❌ yt-dlp模块导入失败: {e}')
     import traceback
