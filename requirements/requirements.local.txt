@@ -1,0 +1,19 @@
+# Core Web Framework
+Flask>=2.3.3
+flask-cors>=4.0.0
+Werkzeug>=2.3.7
+
+# HTTP Requests
+requests>=2.31.0
+
+# yt-dlp related dependencies (for local source)
+pycryptodome>=3.19.0
+websockets>=12.0
+brotli>=1.1.0
+mutagen>=1.47.0
+
+# Basic dependencies
+certifi>=2023.11.17
+
+# Development and debugging
+gunicorn>=21.2.0

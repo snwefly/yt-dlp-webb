@@ -1,0 +1,124 @@
+# 混合模式 Dockerfile
+# 特点：构建时尝试下载，运行时检查补充
+
+# ==========================================
+# 阶段1: 尝试下载 yt-dlp
+# ==========================================
+FROM python:3.11-slim AS ytdlp-downloader
+
+# 安装下载工具
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+RUN pip install --no-cache-dir requests pyyaml
+
+# 复制源管理器
+COPY scripts/ytdlp_source_manager.py /tmp/
+COPY config/ytdlp-source.yml /tmp/
+
+# 设置构建参数
+ARG YTDLP_SOURCE=github_release
+ARG YTDLP_VERSION=latest
+ENV YTDLP_SOURCE=${YTDLP_SOURCE}
+ENV YTDLP_VERSION=${YTDLP_VERSION}
+
+# 尝试下载 yt-dlp（允许失败）
+RUN cd /tmp && \
+    echo "🔽 尝试构建时下载 yt-dlp (源: ${YTDLP_SOURCE}, 版本: ${YTDLP_VERSION})" && \
+    mkdir -p /ytdlp-prepared && \
+    (python ytdlp_source_manager.py \
+        --config ytdlp-source.yml \
+        --target /ytdlp-prepared && \
+    echo "✅ 构建时下载成功" && \
+    echo "build_time_success" > /ytdlp-prepared/.download_status) || \
+    (echo "⚠️ 构建时下载失败，将在运行时重试" && \
+    echo "build_time_failed" > /ytdlp-prepared/.download_status)
+
+# ==========================================
+# 阶段2: 最终应用镜像
+# ==========================================
+FROM python:3.11-slim
+
+# 构建参数
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+ARG YTDLP_SOURCE
+ARG YTDLP_VERSION
+
+# 标签
+LABEL org.opencontainers.image.title="YT-DLP Web (混合模式)"
+LABEL org.opencontainers.image.description="yt-dlp Web界面 - 混合下载模式"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL ytdlp.source="${YTDLP_SOURCE}"
+LABEL ytdlp.version="${YTDLP_VERSION}"
+LABEL build.strategy="hybrid"
+
+# 工作目录
+WORKDIR /app
+
+# 环境变量
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+ENV YTDLP_NO_LAZY_EXTRACTORS=1
+ENV BUILD_STRATEGY=hybrid
+ENV YTDLP_SOURCE=${YTDLP_SOURCE}
+ENV YTDLP_VERSION=${YTDLP_VERSION}
+
+# 创建用户
+RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
+
+# 安装系统依赖（包含下载工具以备运行时使用）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    git \
+    ca-certificates \
+    dos2unix \
+    ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+COPY requirements/requirements.hybrid.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+# 从下载阶段复制结果（可能成功也可能失败）
+COPY --from=ytdlp-downloader /ytdlp-prepared /app/yt-dlp-source
+
+# 复制应用文件
+COPY webapp /app/webapp
+COPY scripts /app/scripts
+COPY config /app/config
+
+# 只复制混合模式需要的启动脚本
+COPY scripts/start-hybrid.sh /app/start.sh
+
+# 设置权限
+RUN dos2unix /app/start.sh && \
+    chmod +x /app/start.sh && \
+    mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
+    chown -R ytdlp:ytdlp /app && \
+    chmod -R 755 /app && \
+    chmod 777 /app/downloads && \
+    echo "✅ 混合模式配置完成"
+
+# 切换用户
+USER ytdlp
+
+# 端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=15s --start-period=45s --retries=4 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# 启动
+CMD ["/app/start.sh"]

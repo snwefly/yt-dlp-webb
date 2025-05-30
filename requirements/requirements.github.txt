@@ -1,0 +1,30 @@
+# GitHub 网络版 yt-dlp 依赖文件
+# 支持动态源选择和版本管理
+
+# Core Web Framework
+Flask>=2.3.3
+flask-cors>=4.0.0
+Werkzeug>=2.3.7
+
+# HTTP Requests
+requests>=2.31.0
+
+# 源管理依赖
+pyyaml>=6.0
+
+# yt-dlp 动态依赖（根据源类型决定）
+# 如果使用 PyPI 源，会自动安装 yt-dlp
+# 如果使用 GitHub 源，会使用下载的源码
+
+# yt-dlp 核心依赖（无论哪种源都需要）
+pycryptodome>=3.19.0
+websockets>=12.0
+brotli>=1.1.0
+mutagen>=1.47.0
+certifi>=2023.11.17
+
+# 开发和调试
+gunicorn>=21.2.0
+
+# 条件依赖标记
+# 注意：实际的 yt-dlp 包安装由源管理器控制

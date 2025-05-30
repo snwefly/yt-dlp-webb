@@ -1,0 +1,83 @@
+# 构建策略配置文件
+# 支持多种镜像构建方式
+
+build_strategies:
+  # 策略1: 构建时拉取 (默认)
+  build_time_download:
+    name: "构建时下载"
+    description: "在 Docker 构建阶段下载 yt-dlp，镜像自包含"
+    dockerfile: "Dockerfile.build-time"
+    advantages:
+      - "镜像自包含，离线可用"
+      - "启动速度快"
+      - "运行稳定"
+    disadvantages:
+      - "镜像体积较大"
+      - "构建时间较长"
+      - "需要网络连接"
+    use_cases:
+      - "生产环境部署"
+      - "离线环境"
+      - "稳定性要求高"
+  
+  # 策略2: 运行时拉取
+  runtime_download:
+    name: "运行时下载"
+    description: "容器启动时动态下载 yt-dlp，镜像轻量"
+    dockerfile: "Dockerfile.runtime"
+    advantages:
+      - "镜像体积小"
+      - "构建速度快"
+      - "版本更新灵活"
+    disadvantages:
+      - "启动时间较长"
+      - "需要网络连接"
+      - "运行时不稳定"
+    use_cases:
+      - "开发环境"
+      - "测试环境"
+      - "快速原型"
+  
+  # 策略3: 混合模式
+  hybrid:
+    name: "混合模式"
+    description: "构建时尝试下载，运行时检查并补充"
+    dockerfile: "Dockerfile.hybrid"
+    advantages:
+      - "兼顾稳定性和灵活性"
+      - "自动回退机制"
+      - "适应性强"
+    disadvantages:
+      - "逻辑复杂"
+      - "调试困难"
+    use_cases:
+      - "CI/CD 环境"
+      - "多环境部署"
+      - "不确定网络环境"
+  
+  # 策略4: 纯本地模式
+  local_only:
+    name: "纯本地模式"
+    description: "仅使用项目中的 yt-dlp 文件，无网络依赖"
+    dockerfile: "Dockerfile.local"
+    advantages:
+      - "完全离线"
+      - "构建快速"
+      - "版本可控"
+    disadvantages:
+      - "需要手动更新"
+      - "可能版本滞后"
+    use_cases:
+      - "内网环境"
+      - "安全要求高"
+      - "版本锁定需求"
+
+# 默认策略
+default_strategy: "hybrid"
+
+# 环境特定策略
+environment_strategies:
+  development: "runtime_download"
+  testing: "hybrid"
+  production: "build_time_download"
+  offline: "local_only"

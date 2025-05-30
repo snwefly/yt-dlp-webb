@@ -1,0 +1,66 @@
+# yt-dlp 源配置文件
+# 支持多种获取方式，实现来源解耦
+
+ytdlp_source:
+  # 当前使用的源类型
+  active: "github_release"
+  
+  # GitHub Release 版本（推荐）
+  github_release:
+    enabled: true
+    repository: "yt-dlp/yt-dlp"
+    version: "latest"  # 或指定版本如 "2024.12.13"
+    asset_pattern: "yt-dlp.tar.gz"
+    fallback_version: "2024.12.13"
+  
+  # GitHub 源码（开发版）
+  github_source:
+    enabled: false
+    repository: "yt-dlp/yt-dlp"
+    branch: "master"
+    commit: "latest"  # 或指定 commit hash
+  
+  # PyPI 包（稳定版）
+  pypi:
+    enabled: true
+    package: "yt-dlp"
+    version: ">=2024.12.13"
+    index_url: "https://pypi.org/simple/"
+  
+  # 本地文件（离线版）
+  local:
+    enabled: true
+    path: "./yt_dlp"
+    backup_path: "./backup/yt_dlp"
+
+# 构建策略配置
+build_strategy:
+  # 优先级顺序（从高到低）
+  priority:
+    - "github_release"
+    - "pypi" 
+    - "github_source"
+    - "local"
+  
+  # 失败回退策略
+  fallback_enabled: true
+  
+  # 缓存配置
+  cache:
+    enabled: true
+    directory: "./.cache/ytdlp"
+    ttl_hours: 24
+
+# 环境特定配置
+environments:
+  development:
+    source_override: "local"
+    cache_enabled: false
+  
+  production:
+    source_override: "github_release"
+    version_lock: true
+  
+  testing:
+    source_override: "pypi"
+    version_specific: "2024.12.13"

@@ -1,0 +1,283 @@
+{
+  "interactive_shortcuts": [
+    {
+      "name": "智能视频下载器",
+      "description": "支持格式选择的交互式下载器",
+      "actions": [
+        {
+          "type": "get_clipboard",
+          "description": "获取剪贴板中的视频链接"
+        },
+        {
+          "type": "choose_from_menu",
+          "description": "选择下载格式",
+          "config": {
+            "prompt": "请选择下载格式",
+            "options": [
+              {
+                "title": "🎬 最佳质量视频",
+                "subtitle": "下载最高质量的视频文件",
+                "value": {
+                  "audio_only": "false",
+                  "quality": "best",
+                  "format": "mp4"
+                }
+              },
+              {
+                "title": "📱 720P视频",
+                "subtitle": "适合手机观看的高清视频",
+                "value": {
+                  "audio_only": "false", 
+                  "quality": "best[height<=720]",
+                  "format": "mp4"
+                }
+              },
+              {
+                "title": "💾 480P视频",
+                "subtitle": "节省空间的标清视频",
+                "value": {
+                  "audio_only": "false",
+                  "quality": "best[height<=480]", 
+                  "format": "mp4"
+                }
+              },
+              {
+                "title": "🎵 高品质音频",
+                "subtitle": "320kbps MP3音频",
+                "value": {
+                  "audio_only": "true",
+                  "quality": "320",
+                  "format": "mp3"
+                }
+              },
+              {
+                "title": "🎶 标准音频",
+                "subtitle": "192kbps MP3音频",
+                "value": {
+                  "audio_only": "true",
+                  "quality": "192",
+                  "format": "mp3"
+                }
+              },
+              {
+                "title": "🔊 无损音频",
+                "subtitle": "FLAC无损格式",
+                "value": {
+                  "audio_only": "true",
+                  "quality": "best",
+                  "format": "flac"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "get_web_contents",
+          "description": "发送下载请求",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "url": "[剪贴板内容]",
+              "audio_only": "[选择的格式.audio_only]",
+              "video_quality": "[选择的格式.quality]",
+              "output_format": "[选择的格式.format]"
+            }
+          }
+        },
+        {
+          "type": "if",
+          "description": "根据格式类型保存文件",
+          "config": {
+            "condition": "[选择的格式.audio_only] == 'true'",
+            "then": [
+              {
+                "type": "save_to_files",
+                "config": {
+                  "destination": "iCloud Drive/音乐"
+                }
+              }
+            ],
+            "else": [
+              {
+                "type": "save_to_photos",
+                "description": "保存视频到相册"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "高级下载器",
+      "description": "支持更多自定义选项",
+      "actions": [
+        {
+          "type": "ask_for_input",
+          "description": "输入视频链接",
+          "config": {
+            "prompt": "请输入或粘贴视频链接",
+            "input_type": "url",
+            "default": "[剪贴板内容]"
+          }
+        },
+        {
+          "type": "choose_from_menu",
+          "description": "选择视频质量",
+          "config": {
+            "prompt": "选择视频质量",
+            "options": [
+              {"title": "🏆 最佳质量", "value": "best"},
+              {"title": "📺 1080P", "value": "best[height<=1080]"},
+              {"title": "📱 720P", "value": "best[height<=720]"},
+              {"title": "💾 480P", "value": "best[height<=480]"},
+              {"title": "📶 360P", "value": "best[height<=360]"},
+              {"title": "🎵 仅音频", "value": "audio_only"}
+            ]
+          }
+        },
+        {
+          "type": "if",
+          "description": "如果选择仅音频，选择音频格式",
+          "config": {
+            "condition": "[视频质量] == 'audio_only'",
+            "then": [
+              {
+                "type": "choose_from_menu",
+                "config": {
+                  "prompt": "选择音频格式",
+                  "options": [
+                    {"title": "🎵 MP3 (320kbps)", "value": "mp3_320"},
+                    {"title": "🎶 MP3 (192kbps)", "value": "mp3_192"},
+                    {"title": "🔊 AAC", "value": "aac"},
+                    {"title": "💎 FLAC (无损)", "value": "flac"}
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "choose_from_menu",
+          "description": "选择额外选项",
+          "config": {
+            "prompt": "需要下载额外内容吗？",
+            "allow_multiple": true,
+            "options": [
+              {"title": "📝 字幕文件", "value": "subtitles"},
+              {"title": "🖼️ 缩略图", "value": "thumbnail"},
+              {"title": "📄 视频描述", "value": "description"},
+              {"title": "📋 播放列表", "value": "playlist"}
+            ]
+          }
+        },
+        {
+          "type": "get_web_contents",
+          "description": "发送下载请求",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "url": "[视频链接]",
+              "video_quality": "[视频质量]",
+              "audio_quality": "[音频格式]",
+              "download_subtitles": "[额外选项包含subtitles]",
+              "download_thumbnail": "[额外选项包含thumbnail]",
+              "download_description": "[额外选项包含description]",
+              "download_playlist": "[额外选项包含playlist]"
+            }
+          }
+        },
+        {
+          "type": "save_to_files",
+          "description": "保存到文件",
+          "config": {
+            "destination": "iCloud Drive/Downloads"
+          }
+        }
+      ]
+    }
+  ],
+  "quick_actions": [
+    {
+      "name": "快速MP3",
+      "icon": "🎵",
+      "config": {
+        "audio_only": "true",
+        "quality": "320",
+        "format": "mp3"
+      }
+    },
+    {
+      "name": "快速720P",
+      "icon": "📱", 
+      "config": {
+        "audio_only": "false",
+        "quality": "best[height<=720]",
+        "format": "mp4"
+      }
+    },
+    {
+      "name": "快速最佳",
+      "icon": "🏆",
+      "config": {
+        "audio_only": "false", 
+        "quality": "best",
+        "format": "best"
+      }
+    }
+  ],
+  "shortcuts_implementation": {
+    "choose_from_menu_example": {
+      "action_type": "选择菜单",
+      "ios_action": "Choose from Menu",
+      "configuration": {
+        "prompt": "选择下载格式",
+        "menu_items": [
+          "🎬 最佳质量视频",
+          "📱 720P视频", 
+          "🎵 高品质音频"
+        ]
+      },
+      "output": "选中的菜单项文本"
+    },
+    "conditional_logic_example": {
+      "action_type": "条件判断",
+      "ios_action": "If",
+      "configuration": {
+        "condition": "选择的菜单 包含 音频",
+        "then_actions": ["保存到文件"],
+        "else_actions": ["保存到相册"]
+      }
+    },
+    "text_processing_example": {
+      "action_type": "文本处理",
+      "ios_action": "Get Text from Input",
+      "usage": "从菜单选择中提取参数值"
+    }
+  },
+  "advanced_features": {
+    "batch_download": {
+      "description": "批量下载多个视频",
+      "implementation": "使用重复动作循环处理URL列表"
+    },
+    "quality_detection": {
+      "description": "自动检测最佳质量",
+      "implementation": "先调用info API获取可用格式"
+    },
+    "progress_tracking": {
+      "description": "显示下载进度",
+      "implementation": "使用异步API轮询状态"
+    },
+    "error_handling": {
+      "description": "错误处理和重试",
+      "implementation": "检查HTTP状态码并显示错误信息"
+    }
+  }
+}

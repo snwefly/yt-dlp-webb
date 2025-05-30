@@ -1,0 +1,76 @@
+# 使用本地 yt-dlp 文件的 Dockerfile（备份方案）
+FROM python:3.11-slim
+
+# 构建参数
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+
+# 添加标签
+LABEL org.opencontainers.image.title="YT-DLP 网页界面 (本地版本)"
+LABEL org.opencontainers.image.description="带下载管理的yt-dlp网页界面 - 使用本地yt-dlp文件"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL org.opencontainers.image.revision="${REVISION}"
+LABEL org.opencontainers.image.source="https://github.com/zhumao520/yt-dlp-web"
+LABEL org.opencontainers.image.licenses="Unlicense"
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV VERSION=${VERSION}
+ENV REVISION=${REVISION}
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/app
+ENV YTDLP_NO_LAZY_EXTRACTORS=1
+
+# 创建非root用户
+RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    dos2unix \
+    ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# 升级pip并安装Python依赖
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# 复制requirements文件（不包含yt-dlp）
+COPY requirements.local.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制项目文件（包含本地yt-dlp）
+COPY webapp /app/webapp
+COPY yt_dlp /app/yt_dlp
+COPY start.sh /app/start.sh
+
+# 设置启动脚本权限并创建目录
+RUN dos2unix /app/start.sh && \
+    chmod +x /app/start.sh && \
+    mkdir -p /app/downloads /app/config /app/logs && \
+    chown -R ytdlp:ytdlp /app && \
+    chmod -R 755 /app && \
+    echo "✅ 文件和权限设置完成"
+
+# 切换到非root用户
+USER ytdlp
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/ || exit 1
+
+# 启动命令
+CMD ["/app/start.sh"]

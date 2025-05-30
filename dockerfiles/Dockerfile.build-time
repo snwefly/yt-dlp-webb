@@ -1,0 +1,118 @@
+# 构建时下载 yt-dlp 的 Dockerfile
+# 特点：镜像自包含，启动快，体积大
+
+# ==========================================
+# 阶段1: yt-dlp 源下载阶段
+# ==========================================
+FROM python:3.11-slim AS ytdlp-downloader
+
+# 安装下载工具
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+RUN pip install --no-cache-dir requests pyyaml
+
+# 复制源管理器
+COPY scripts/ytdlp_source_manager.py /tmp/
+COPY config/ytdlp-source.yml /tmp/
+
+# 设置构建参数
+ARG YTDLP_SOURCE=github_release
+ARG YTDLP_VERSION=latest
+ENV YTDLP_SOURCE=${YTDLP_SOURCE}
+ENV YTDLP_VERSION=${YTDLP_VERSION}
+
+# 下载 yt-dlp
+RUN cd /tmp && \
+    echo "🔽 构建时下载 yt-dlp (源: ${YTDLP_SOURCE}, 版本: ${YTDLP_VERSION})" && \
+    python ytdlp_source_manager.py \
+        --config ytdlp-source.yml \
+        --target /ytdlp-prepared && \
+    echo "✅ yt-dlp 下载完成" && \
+    ls -la /ytdlp-prepared/
+
+# ==========================================
+# 阶段2: 最终应用镜像
+# ==========================================
+FROM python:3.11-slim
+
+# 构建参数
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+ARG YTDLP_SOURCE
+ARG YTDLP_VERSION
+
+# 标签
+LABEL org.opencontainers.image.title="YT-DLP Web (构建时下载)"
+LABEL org.opencontainers.image.description="yt-dlp Web界面 - 构建时下载模式"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL ytdlp.source="${YTDLP_SOURCE}"
+LABEL ytdlp.version="${YTDLP_VERSION}"
+LABEL build.strategy="build_time_download"
+
+# 工作目录
+WORKDIR /app
+
+# 环境变量
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+ENV YTDLP_NO_LAZY_EXTRACTORS=1
+ENV BUILD_STRATEGY=build_time_download
+
+# 创建用户
+RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    dos2unix \
+    ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
+COPY requirements/requirements.github.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+# 从下载阶段复制 yt-dlp
+COPY --from=ytdlp-downloader /ytdlp-prepared /app/yt-dlp-source
+
+# 复制应用文件
+COPY webapp /app/webapp
+COPY scripts /app/scripts
+COPY config /app/config
+
+# 只复制构建时模式需要的启动脚本
+COPY scripts/start.sh /app/start.sh
+
+# 设置权限
+RUN dos2unix /app/start.sh && \
+    chmod +x /app/start.sh && \
+    mkdir -p /app/downloads /app/config /app/logs && \
+    chown -R ytdlp:ytdlp /app && \
+    chmod -R 755 /app && \
+    chmod 777 /app/downloads && \
+    echo "✅ 构建时下载模式配置完成"
+
+# 切换用户
+USER ytdlp
+
+# 端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# 启动
+CMD ["/app/start.sh"]

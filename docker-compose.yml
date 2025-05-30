@@ -1,0 +1,59 @@
+# 主 Docker Compose 文件
+# 默认使用混合模式
+
+version: '3.8'
+
+services:
+  yt-dlp-web:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.hybrid
+      args:
+        YTDLP_SOURCE: ${YTDLP_SOURCE:-github_release}
+        YTDLP_VERSION: ${YTDLP_VERSION:-latest}
+        ENVIRONMENT: ${ENVIRONMENT:-production}
+
+    container_name: yt-dlp-web
+    restart: unless-stopped
+
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+
+    volumes:
+      - downloads:/app/downloads
+      - config:/app/config
+      - logs:/app/logs
+
+    environment:
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - SECRET_KEY=${SECRET_KEY:-dev-key-change-in-production}
+      - YTDLP_SOURCE=${YTDLP_SOURCE:-github_release}
+      - YTDLP_VERSION=${YTDLP_VERSION:-latest}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - TZ=Asia/Shanghai
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    labels:
+      - "app.name=yt-dlp-web"
+      - "app.description=yt-dlp Web界面 - 混合模式"
+      - "app.version=1.0.0"
+      - "app.strategy=hybrid"
+
+volumes:
+  downloads:
+    driver: local
+  config:
+    driver: local
+  logs:
+    driver: local
+
+# 使用其他策略的示例:
+# 构建时下载: docker-compose -f docker-compose.build-time.yml up -d
+# 运行时下载: docker-compose -f docker-compose.runtime.yml up -d

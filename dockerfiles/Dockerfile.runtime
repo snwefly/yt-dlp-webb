@@ -1,0 +1,81 @@
+# 运行时下载 yt-dlp 的 Dockerfile
+# 特点：镜像轻量，启动慢，灵活更新
+
+FROM python:3.11-slim
+
+# 构建参数
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+ARG YTDLP_SOURCE=github_release
+ARG YTDLP_VERSION=latest
+
+# 标签
+LABEL org.opencontainers.image.title="YT-DLP Web (运行时下载)"
+LABEL org.opencontainers.image.description="yt-dlp Web界面 - 运行时下载模式"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL ytdlp.source="${YTDLP_SOURCE}"
+LABEL ytdlp.version="${YTDLP_VERSION}"
+LABEL build.strategy="runtime_download"
+
+# 工作目录
+WORKDIR /app
+
+# 环境变量
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+ENV YTDLP_NO_LAZY_EXTRACTORS=1
+ENV BUILD_STRATEGY=runtime_download
+ENV YTDLP_SOURCE=${YTDLP_SOURCE}
+ENV YTDLP_VERSION=${YTDLP_VERSION}
+
+# 创建用户
+RUN groupadd -r ytdlp && useradd -r -g ytdlp -u 1000 ytdlp
+
+# 安装系统依赖（包含下载工具）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    git \
+    ca-certificates \
+    dos2unix \
+    ffmpeg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖（包含源管理器依赖）
+COPY requirements/requirements.runtime.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
+
+# 复制应用文件（不包含 yt-dlp 源码）
+COPY webapp /app/webapp
+COPY scripts /app/scripts
+COPY config /app/config
+
+# 只复制运行时模式需要的启动脚本
+COPY scripts/start-runtime.sh /app/start.sh
+
+# 设置权限
+RUN dos2unix /app/start.sh && \
+    chmod +x /app/start.sh && \
+    mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
+    chown -R ytdlp:ytdlp /app && \
+    chmod -R 755 /app && \
+    chmod 777 /app/downloads && \
+    echo "✅ 运行时下载模式配置完成"
+
+# 切换用户
+USER ytdlp
+
+# 端口
+EXPOSE 8080
+
+# 健康检查（延长启动时间）
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# 启动
+CMD ["/app/start.sh"]

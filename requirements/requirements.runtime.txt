@@ -1,0 +1,28 @@
+# 运行时下载模式依赖文件
+# 不包含 yt-dlp，将在运行时动态安装
+
+# Core Web Framework
+Flask>=2.3.3
+flask-cors>=4.0.0
+Werkzeug>=2.3.7
+
+# HTTP Requests
+requests>=2.31.0
+
+# 源管理依赖
+pyyaml>=6.0
+
+# yt-dlp 运行时依赖（为动态安装做准备）
+pycryptodome>=3.19.0
+websockets>=12.0
+brotli>=1.1.0
+mutagen>=1.47.0
+certifi>=2023.11.17
+
+# 开发和调试
+gunicorn>=21.2.0
+
+# 系统监控
+psutil>=5.9.0
+
+# 注意：yt-dlp 将在运行时通过 pip 动态安装

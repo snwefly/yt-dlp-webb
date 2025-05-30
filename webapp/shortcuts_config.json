@@ -1,0 +1,205 @@
+{
+  "shortcuts": [
+    {
+      "name": "视频下载器",
+      "description": "从剪贴板获取视频链接并下载到相册",
+      "actions": [
+        {
+          "type": "get_clipboard",
+          "description": "获取剪贴板内容作为视频URL"
+        },
+        {
+          "type": "get_web_contents",
+          "description": "发送下载请求",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "url": "[剪贴板内容]",
+              "audio_only": "false",
+              "quality": "best"
+            }
+          }
+        },
+        {
+          "type": "save_to_photos",
+          "description": "保存视频到相册"
+        }
+      ]
+    },
+    {
+      "name": "音频提取器",
+      "description": "提取视频音频并保存到文件",
+      "actions": [
+        {
+          "type": "get_clipboard",
+          "description": "获取剪贴板内容作为视频URL"
+        },
+        {
+          "type": "get_web_contents",
+          "description": "发送音频提取请求",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "url": "[剪贴板内容]",
+              "audio_only": "true",
+              "quality": "320"
+            }
+          }
+        },
+        {
+          "type": "save_to_files",
+          "description": "保存音频到文件app",
+          "config": {
+            "destination": "iCloud Drive/Downloads"
+          }
+        }
+      ]
+    },
+    {
+      "name": "高质量视频下载",
+      "description": "下载720p视频",
+      "actions": [
+        {
+          "type": "ask_for_input",
+          "description": "请求用户输入视频URL",
+          "config": {
+            "prompt": "请输入视频链接",
+            "input_type": "url"
+          }
+        },
+        {
+          "type": "get_web_contents",
+          "description": "发送720p下载请求",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "url": "[用户输入]",
+              "audio_only": "false",
+              "quality": "best[height<=720]"
+            }
+          }
+        },
+        {
+          "type": "save_to_photos",
+          "description": "保存到相册"
+        }
+      ]
+    },
+    {
+      "name": "批量下载器（异步）",
+      "description": "适合大文件的异步下载",
+      "actions": [
+        {
+          "type": "get_clipboard",
+          "description": "获取视频URL"
+        },
+        {
+          "type": "get_web_contents",
+          "description": "提交下载任务",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "url": "[剪贴板内容]",
+              "audio_only": "false",
+              "quality": "best"
+            }
+          }
+        },
+        {
+          "type": "get_value",
+          "description": "提取download_id",
+          "config": {
+            "key": "download_id"
+          }
+        },
+        {
+          "type": "repeat",
+          "description": "轮询下载状态",
+          "config": {
+            "times": 60,
+            "actions": [
+              {
+                "type": "wait",
+                "config": {
+                  "seconds": 5
+                }
+              },
+              {
+                "type": "get_web_contents",
+                "config": {
+                  "url": "http://YOUR_SERVER_IP:8080/api/download/[download_id]/status",
+                  "method": "GET"
+                }
+              },
+              {
+                "type": "get_value",
+                "config": {
+                  "key": "status"
+                }
+              },
+              {
+                "type": "if",
+                "config": {
+                  "condition": "status == 'completed'",
+                  "then": "break_loop"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "get_web_contents",
+          "description": "下载完成的文件",
+          "config": {
+            "url": "http://YOUR_SERVER_IP:8080/api/shortcuts/download/[download_id]/file",
+            "method": "GET"
+          }
+        },
+        {
+          "type": "save_to_photos",
+          "description": "保存到相册"
+        }
+      ]
+    }
+  ],
+  "server_config": {
+    "base_url": "http://YOUR_SERVER_IP:8080",
+    "endpoints": {
+      "direct_download": "/api/shortcuts/download-direct",
+      "async_download": "/api/shortcuts/download",
+      "status_check": "/api/download/{id}/status",
+      "file_download": "/api/shortcuts/download/{id}/file"
+    }
+  },
+  "installation_steps": [
+    "1. 替换配置中的 YOUR_SERVER_IP 为实际服务器IP地址",
+    "2. 在iOS设备上打开快捷指令app",
+    "3. 点击右上角的 + 号创建新快捷指令",
+    "4. 按照上述配置添加相应的动作",
+    "5. 测试快捷指令是否正常工作",
+    "6. 可以添加到主屏幕或分享给其他用户"
+  ],
+  "tips": [
+    "建议先用小视频测试功能",
+    "大文件建议使用异步下载模式",
+    "可以在快捷指令中添加错误处理逻辑",
+    "支持从Safari分享菜单直接调用",
+    "可以设置Siri语音触发"
+  ]
+}
