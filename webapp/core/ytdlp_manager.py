@@ -31,13 +31,17 @@ class YtdlpManager:
 
             logger.info("🔍 初始化 yt-dlp...")
 
-            # 测试基础功能
+            # 只测试基础导入，不创建实例
             from yt_dlp import YoutubeDL
-            ydl = YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': True})
 
-            # 测试基础 extractors
-            from yt_dlp.extractor.youtube import YoutubeIE
-            from yt_dlp.extractor.generic import GenericIE
+            # 测试基础 extractors 导入
+            try:
+                from yt_dlp.extractor.youtube import YoutubeIE
+                from yt_dlp.extractor.generic import GenericIE
+                logger.info("✅ 基础 extractors 导入成功")
+            except ImportError as e:
+                logger.warning(f"⚠️ 某些 extractors 导入失败: {e}")
+                # 继续运行，因为核心功能仍然可用
 
             logger.info("✅ yt-dlp 初始化成功")
             self._available = True
@@ -62,17 +66,22 @@ class YtdlpManager:
         if not self.is_available():
             raise RuntimeError("yt-dlp 不可用")
 
-        from yt_dlp import YoutubeDL
+        try:
+            from yt_dlp import YoutubeDL
 
-        default_options = {
-            'quiet': True,
-            'no_warnings': True,
-        }
+            default_options = {
+                'quiet': True,
+                'no_warnings': True,
+                'ignoreerrors': True,  # 忽略单个 extractor 错误
+            }
 
-        if options:
-            default_options.update(options)
+            if options:
+                default_options.update(options)
 
-        return YoutubeDL(default_options)
+            return YoutubeDL(default_options)
+        except Exception as e:
+            logger.error(f"❌ 创建下载器失败: {e}")
+            raise RuntimeError(f"无法创建下载器: {e}")
 
     def get_enhanced_options(self):
         """获取增强的 yt-dlp 选项"""

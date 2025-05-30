@@ -123,7 +123,7 @@ def login_required(f):
             return jsonify({'error': '需要登录', 'code': 'AUTH_REQUIRED'}), 401
 
         # 对于页面请求，构建重定向URL
-        redirect_url = url_for('login')
+        redirect_url = url_for('auth.login')
         if request.path != '/login':
             redirect_url += f'?redirect={request.path}'
 
@@ -144,12 +144,12 @@ def admin_required(f):
         else:
             if request.path.startswith('/api/'):
                 return jsonify({'error': '需要登录', 'code': 'AUTH_REQUIRED'}), 401
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
 
         if not auth_manager.verify_session(token):
             if request.path.startswith('/api/'):
                 return jsonify({'error': '会话已过期', 'code': 'SESSION_EXPIRED'}), 401
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
 
         # 检查是否为管理员
         username = auth_manager.get_session_user(token)

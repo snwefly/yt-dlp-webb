@@ -8,10 +8,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # 下载文件持久化存储
-      - ./downloads:/app/downloads
+      # 下载文件持久化存储（使用命名卷避免权限问题）
+      - downloads:/app/downloads
       # 配置文件持久化（可选）
-      - ./config:/app/config
+      - config:/app/config
     environment:
       # 管理员账号配置
       - ADMIN_USERNAME=admin
