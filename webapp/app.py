@@ -80,11 +80,29 @@ def _init_directories(app):
         except Exception as e:
             logger.warning(f"⚠️ 下载目录权限测试失败: {e}")
 
-            # 尝试使用临时目录作为备用
-            import tempfile
-            temp_dir = tempfile.mkdtemp(prefix='ytdlp_downloads_')
-            app.config['DOWNLOAD_FOLDER'] = temp_dir
-            logger.info(f"🔄 使用临时目录作为下载目录: {temp_dir}")
+            # 尝试修复权限
+            try:
+                import stat
+                os.chmod(download_folder, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                # 再次测试
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                logger.info(f"✅ 权限修复成功: {download_folder}")
+            except Exception as e2:
+                logger.warning(f"⚠️ 权限修复失败: {e2}")
+
+                # 尝试使用临时目录作为备用
+                import tempfile
+                temp_dir = tempfile.mkdtemp(prefix='ytdlp_downloads_')
+                app.config['DOWNLOAD_FOLDER'] = temp_dir
+                logger.info(f"🔄 使用临时目录作为下载目录: {temp_dir}")
+
+                # 确保临时目录权限正确
+                try:
+                    os.chmod(temp_dir, 0o777)
+                except Exception:
+                    pass
 
     except Exception as e:
         logger.error(f"目录初始化失败: {e}")

@@ -27,6 +27,9 @@ class YtdlpManager:
 
             logger.info("🔍 初始化 yt-dlp...")
 
+            # 先运行 extractor 修复
+            self._run_extractor_fix()
+
             # 只测试基础导入，不创建实例
             from yt_dlp import YoutubeDL
 
@@ -39,6 +42,19 @@ class YtdlpManager:
                 logger.warning(f"⚠️ 某些 extractors 导入失败: {e}")
                 # 继续运行，因为核心功能仍然可用
 
+            # 测试创建最小实例
+            try:
+                test_ydl = YoutubeDL({
+                    'quiet': True,
+                    'no_warnings': True,
+                    'ignoreerrors': True,
+                    'extract_flat': True,
+                })
+                logger.info("✅ yt-dlp 实例测试成功")
+            except Exception as e:
+                logger.warning(f"⚠️ yt-dlp 实例测试失败: {e}")
+                # 仍然标记为可用，但使用更保守的配置
+
             logger.info("✅ yt-dlp 初始化成功")
             self._available = True
 
@@ -50,6 +66,27 @@ class YtdlpManager:
             self._initialized = True
 
         return self._available
+
+    def _run_extractor_fix(self):
+        """运行 extractor 修复"""
+        try:
+            import subprocess
+            import sys
+
+            # 尝试运行修复脚本
+            fix_script = "/app/scripts/fix_extractors.py"
+            if os.path.exists(fix_script):
+                logger.info("🔧 运行 extractor 修复脚本...")
+                result = subprocess.run([sys.executable, fix_script],
+                                      capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    logger.info("✅ extractor 修复成功")
+                else:
+                    logger.warning(f"⚠️ extractor 修复失败: {result.stderr}")
+            else:
+                logger.info("ℹ️ extractor 修复脚本不存在，跳过修复")
+        except Exception as e:
+            logger.warning(f"⚠️ extractor 修复过程出错: {e}")
 
     def is_available(self):
         """检查 yt-dlp 是否可用"""
