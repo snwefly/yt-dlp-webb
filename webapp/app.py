@@ -15,30 +15,13 @@ os.environ['YTDLP_IGNORE_EXTRACTOR_ERRORS'] = '1'
 logger = logging.getLogger(__name__)
 
 def _fix_directory_permissions(directory):
-    """强力修复目录权限"""
+    """修复目录权限（以 root 用户运行，简化处理）"""
     try:
-        import stat
-        import subprocess
-
-        # 尝试多种权限修复方式
-        methods = [
-            lambda: os.chmod(directory, 0o777),
-            lambda: os.chmod(directory, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO),
-            lambda: subprocess.run(['chmod', '777', directory], check=False, capture_output=True),
-            lambda: subprocess.run(['chown', '-R', f'{os.getuid()}:{os.getgid()}', directory], check=False, capture_output=True),
-        ]
-
-        for i, method in enumerate(methods):
-            try:
-                method()
-                logger.debug(f"✅ 权限修复方法 {i+1} 成功")
-                break
-            except Exception as e:
-                logger.debug(f"⚠️ 权限修复方法 {i+1} 失败: {e}")
-                continue
-
+        # 以 root 用户运行，直接设置权限
+        os.chmod(directory, 0o755)
+        logger.debug(f"✅ 目录权限设置成功: {directory}")
     except Exception as e:
-        logger.debug(f"⚠️ 权限修复过程出错: {e}")
+        logger.debug(f"⚠️ 权限设置失败: {e}")
 
 def _test_directory_write(test_file, directory):
     """测试目录写入权限"""
@@ -97,41 +80,25 @@ def _initialize_app(app):
         logger.error(f"应用初始化失败: {e}")
 
 def _init_directories(app):
-    """初始化目录"""
+    """初始化目录（以 root 用户运行，简化处理）"""
     try:
         download_folder = app.config['DOWNLOAD_FOLDER']
         os.makedirs(download_folder, exist_ok=True)
         logger.info(f"下载目录已创建: {download_folder}")
 
-        # 尝试修复权限
-        try:
-            os.chmod(download_folder, 0o777)
-        except Exception:
-            pass  # 忽略权限修改失败
-
-        # 强力权限修复
+        # 设置权限
         _fix_directory_permissions(download_folder)
 
         # 权限测试
         test_file = os.path.join(download_folder, '.write_test')
-        if not _test_directory_write(test_file, download_folder):
-            # 如果权限测试失败，尝试使用临时目录
-            import tempfile
-            temp_dir = tempfile.mkdtemp(prefix='ytdlp_downloads_')
-            app.config['DOWNLOAD_FOLDER'] = temp_dir
-            logger.info(f"🔄 使用临时目录作为下载目录: {temp_dir}")
-
-            # 确保临时目录权限正确
-            _fix_directory_permissions(temp_dir)
-
-            # 再次测试临时目录
-            temp_test_file = os.path.join(temp_dir, '.write_test')
-            if not _test_directory_write(temp_test_file, temp_dir):
-                logger.error("❌ 临时目录也无法写入，可能存在系统级权限问题")
+        if _test_directory_write(test_file, download_folder):
+            logger.info(f"✅ 下载目录权限验证成功: {download_folder}")
+        else:
+            logger.warning(f"⚠️ 下载目录权限测试失败，但继续运行: {download_folder}")
 
     except Exception as e:
         logger.error(f"目录初始化失败: {e}")
-        # 使用系统临时目录作为最后备用
+        # 使用系统临时目录作为备用
         import tempfile
         temp_dir = tempfile.mkdtemp(prefix='ytdlp_fallback_')
         app.config['DOWNLOAD_FOLDER'] = temp_dir

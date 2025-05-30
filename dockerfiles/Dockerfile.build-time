@@ -98,24 +98,23 @@ COPY .env* /app/
 # 只复制构建时模式需要的启动脚本
 COPY scripts/start.sh /app/start.sh
 
-# 设置权限
+# 设置权限和目录（使用 root 用户运行）
 RUN dos2unix /app/start.sh && \
     chmod +x /app/start.sh && \
     chmod +x /app/scripts/*.sh && \
+    # 创建应用所需目录
     mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
-    # 确保 ytdlp 用户的家目录存在且有正确权限
-    mkdir -p /home/ytdlp && \
-    chown -R ytdlp:ytdlp /home/ytdlp && \
-    chmod 755 /home/ytdlp && \
-    # 设置应用目录权限
-    chown -R ytdlp:ytdlp /app && \
-    chmod -R 755 /app && \
-    chmod 777 /app/downloads /app/logs /app/yt-dlp-cache && \
-    chown ytdlp:ytdlp /app/downloads /app/logs /app/yt-dlp-cache && \
-    echo "✅ 构建时下载模式配置完成"
+    # 设置目录权限（root 用户拥有完全权限）
+    chmod 755 /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
+    # 确保脚本可执行
+    chmod +x /app/start.sh /app/scripts/*.sh && \
+    # 测试写入权限
+    touch /app/downloads/.test_write && rm /app/downloads/.test_write && \
+    touch /app/logs/.test_write && rm /app/logs/.test_write && \
+    echo "✅ 构建时下载模式配置完成，权限测试通过"
 
-# 切换用户
-USER ytdlp
+# 使用 root 用户运行（注释掉 USER 指令）
+# USER ytdlp
 
 # 端口
 EXPOSE 8080
