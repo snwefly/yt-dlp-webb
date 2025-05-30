@@ -241,7 +241,7 @@
 
             loginForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
-                
+
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
                 const remember = document.getElementById('remember').checked;
@@ -267,16 +267,16 @@
 
                     if (response.ok) {
                         showSuccess('登录成功，正在跳转...');
-                        
+
                         // 保存token到localStorage（如果选择记住登录）
                         if (remember && data.token) {
                             localStorage.setItem('auth_token', data.token);
                         }
-                        
+
                         // 跳转到主页或指定页面
                         setTimeout(() => {
                             const redirect = new URLSearchParams(window.location.search).get('redirect');
-                            window.location.href = redirect || '/admin';
+                            window.location.href = redirect || '/';
                         }, 1000);
                     } else {
                         showError(data.error || '登录失败');
@@ -328,7 +328,7 @@
                     if (response.ok) {
                         // 已登录，直接跳转
                         const redirect = new URLSearchParams(window.location.search).get('redirect');
-                        window.location.href = redirect || '/admin';
+                        window.location.href = redirect || '/';
                     }
                 });
             }

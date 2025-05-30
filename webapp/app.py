@@ -158,8 +158,17 @@ def create_app(config=None):
     if config:
         app.config.update(config)
 
-    # 确保下载文件夹存在
-    os.makedirs(app.config['DOWNLOAD_FOLDER'], exist_ok=True)
+    # 确保下载文件夹存在并设置正确权限
+    download_folder = app.config['DOWNLOAD_FOLDER']
+    os.makedirs(download_folder, exist_ok=True)
+
+    # 尝试修复权限问题
+    try:
+        # 设置目录权限为775（所有者和组可读写执行，其他用户可读执行）
+        os.chmod(download_folder, 0o775)
+        logger.info(f"下载目录权限已设置: {download_folder}")
+    except Exception as e:
+        logger.warning(f"无法设置下载目录权限: {e}")
 
     # 初始化文件清理管理器
     cleanup_config = {
@@ -183,11 +192,13 @@ def register_routes(app):
     """注册所有应用程序路由"""
 
     @app.route('/')
+    @login_required
     def index():
         """主网页界面"""
         return render_template('index.html')
 
     @app.route('/shortcuts-help')
+    @login_required
     def shortcuts_help():
         """iOS快捷指令使用指南"""
         return render_template('shortcuts_help.html')
@@ -291,6 +302,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 500
 
     @app.route('/api/info', methods=['POST'])
+    @login_required
     def get_video_info():
         """获取视频信息而不下载"""
         try:
@@ -330,19 +342,19 @@ def register_routes(app):
                 last_error = e
                 app.logger.warning(f"Android 客户端失败: {str(e)}")
 
-                # 策略2: 使用 Web 客户端
+                # 策略2: 使用 TV Embedded 客户端
                 try:
                     fallback_opts = ydl_opts.copy()
                     fallback_opts['extractor_args'] = {
                         'youtube': {
-                            'player_client': ['web'],
+                            'player_client': ['tv_embedded'],
                         }
                     }
                     with YoutubeDL(fallback_opts) as ydl:
                         info = ydl.extract_info(url, download=False)
                 except Exception as e2:
                     last_error = e2
-                    app.logger.warning(f"Web 客户端失败: {str(e2)}")
+                    app.logger.warning(f"TV Embedded 客户端失败: {str(e2)}")
 
                     # 策略3: 最基础配置
                     try:
@@ -390,6 +402,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 500
 
     @app.route('/api/download', methods=['POST'])
+    @login_required
     def start_download():
         """开始视频下载 - 支持高级选项"""
         try:
@@ -437,6 +450,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 500
 
     @app.route('/api/download/<download_id>/status')
+    @login_required
     def get_download_status(download_id):
         """获取下载状态"""
         download = download_manager.get_download(download_id)
@@ -446,12 +460,14 @@ def register_routes(app):
         return jsonify(download)
 
     @app.route('/api/downloads')
+    @login_required
     def list_downloads():
         """列出所有下载"""
         downloads = download_manager.get_all_downloads()
         return jsonify({'downloads': downloads})
 
     @app.route('/api/shortcuts/download', methods=['POST'])
+    @login_required
     def shortcuts_download():
         """iOS 快捷指令兼容的下载端点 - 异步模式"""
         try:
@@ -504,6 +520,7 @@ def register_routes(app):
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/shortcuts/download-direct', methods=['POST'])
+    @login_required
     def shortcuts_download_direct():
         """iOS 快捷指令直接下载端点 - 同步模式"""
         try:
@@ -577,6 +594,7 @@ def register_routes(app):
             return jsonify({'success': False, 'error': str(e)}), 500
 
     @app.route('/api/shortcuts/download/<download_id>/file')
+    @login_required
     def shortcuts_get_file(download_id):
         """获取iOS快捷指令下载的文件"""
         download = download_manager.get_download(download_id)
@@ -608,6 +626,7 @@ def register_routes(app):
         )
 
     @app.route('/api/formats', methods=['POST'])
+    @login_required
     def get_available_formats():
         """获取视频可用格式列表 - 用于快捷指令动态选择"""
         try:
@@ -694,11 +713,19 @@ def register_routes(app):
             import json
 
             # 执行更新检查脚本
+            script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'update_yt_dlp.py')
+            if not os.path.exists(script_path):
+                return jsonify({
+                    'update_available': False,
+                    'message': '更新脚本不存在',
+                    'current_version': _get_current_version(),
+                    'latest_version': _get_current_version()
+                })
+
             result = subprocess.run(
-                ['python3', 'update_yt_dlp.py', '--check'],
+                ['python3', script_path, '--check'],
                 capture_output=True,
-                text=True,
-                cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                text=True
             )
 
             if result.returncode == 0:
@@ -730,10 +757,11 @@ def register_routes(app):
             def update_worker():
                 """后台更新工作线程"""
                 try:
-                    subprocess.run(
-                        ['python3', 'update_yt_dlp.py', '--force'],
-                        cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                    )
+                    script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'update_yt_dlp.py')
+                    if os.path.exists(script_path):
+                        subprocess.run(['python3', script_path, '--force'])
+                    else:
+                        print("更新脚本不存在")
                 except Exception as e:
                     print(f"更新失败: {e}")
 
@@ -864,6 +892,7 @@ def register_routes(app):
             return jsonify({'error': str(e)}), 500
 
     @app.route('/downloads/<filename>')
+    @login_required
     def download_file(filename):
         """提供下载的文件"""
         return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename)
@@ -872,22 +901,22 @@ def register_routes(app):
 def _get_enhanced_ydl_options():
     """获取增强的 yt-dlp 配置以绕过 YouTube 检测"""
     return {
-        # 反检测配置 - 使用 Android 客户端绕过检测
+        # 反检测配置 - 使用推荐的客户端组合
         'extractor_args': {
             'youtube': {
-                'player_client': ['android'],  # 优先使用 Android 客户端
+                # 使用推荐的客户端组合：tv_embedded, mweb, android_vr
+                # 根据官方文档，这些客户端目前不需要PO Token
+                'player_client': ['tv_embedded', 'mweb', 'android_vr', 'web'],
                 'player_skip': ['webpage'],  # 跳过网页解析
-                'skip': ['hls'],  # 跳过 HLS 格式
+                'skip': ['hls'],  # 跳过 HLS 格式以避免某些问题
                 'innertube_host': 'www.youtube.com',
                 'innertube_key': None,
                 'check_formats': None,
             }
         },
-        # Android 客户端的用户代理
+        # 通用浏览器用户代理
         'http_headers': {
-            'User-Agent': 'com.google.android.youtube/17.36.4 (Linux; U; Android 12; GB) gzip',
-            'X-YouTube-Client-Name': '3',
-            'X-YouTube-Client-Version': '17.36.4',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate',
@@ -918,10 +947,11 @@ def _build_ydl_options(data, download_folder):
 
     # 基础配置
     ydl_opts = {
-        'outtmpl': os.path.join(download_folder, '%(title).200s.%(ext)s'),  # 限制标题长度
+        'outtmpl': os.path.join(download_folder, '%(uploader)s - %(title).150s.%(ext)s'),  # 限制标题长度并添加上传者
         'quiet': True,
         'no_warnings': True,
         'restrictfilenames': True,  # 限制文件名字符
+        'windowsfilenames': True,  # 确保Windows兼容的文件名
         'writeinfojson': False,  # 默认不写入info json
         'writesubtitles': False,  # 默认不下载字幕
         'writeautomaticsub': False,  # 默认不下载自动字幕
@@ -1198,13 +1228,13 @@ def _download_worker(download_id, url, ydl_opts):
                 last_error = e
                 logger.warning(f"下载策略1失败 (尝试 {retry_count + 1}/{max_retries}): {str(e)}")
 
-                # 策略2: 使用Web客户端
+                # 策略2: 使用TV Embedded客户端
                 if not success and 'youtube.com' in url:
                     try:
                         fallback_opts = ydl_opts.copy()
                         fallback_opts['extractor_args'] = {
                             'youtube': {
-                                'player_client': ['web'],
+                                'player_client': ['tv_embedded'],
                             }
                         }
                         with YoutubeDL(fallback_opts) as ydl:
