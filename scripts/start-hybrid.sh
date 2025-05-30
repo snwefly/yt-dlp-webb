@@ -94,6 +94,12 @@ else
     log_warning "未找到构建时状态文件"
 fi
 
+# 修复 extractor 导入问题
+log_info "🔧 修复 extractor 导入问题..."
+if [ -f "/app/scripts/fix_extractor_imports.py" ]; then
+    python /app/scripts/fix_extractor_imports.py || log_warning "extractor 修复失败，继续启动"
+fi
+
 # 使用通用 yt-dlp 安装脚本
 log_info "🔧 安装和验证 yt-dlp..."
 if [ -f "/app/scripts/ytdlp_installer.sh" ]; then

@@ -65,19 +65,21 @@ COPY scripts/start-runtime.sh /app/start.sh
 RUN dos2unix /app/start.sh && \
     chmod +x /app/start.sh && \
     chmod +x /app/scripts/*.sh && \
-    mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
     # 确保 ytdlp 用户的家目录存在且有正确权限
     mkdir -p /home/ytdlp && \
     chown -R ytdlp:ytdlp /home/ytdlp && \
     chmod 755 /home/ytdlp && \
-    # 设置应用目录权限 - 更宽松的权限设置
+    # 创建应用所需目录
+    mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
+    # 设置整个应用目录的所有权给 ytdlp 用户
     chown -R ytdlp:ytdlp /app && \
-    chmod -R 755 /app && \
-    # 为关键目录设置更宽松的权限，确保写入成功
-    chmod 777 /app/downloads /app/logs /app/yt-dlp-cache && \
-    chown ytdlp:ytdlp /app/downloads /app/logs /app/yt-dlp-cache && \
+    # 为关键目录设置写入权限（755 对所有者有写入权限）
+    chmod 755 /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
+    # 确保脚本可执行
+    chmod +x /app/start.sh /app/scripts/*.sh && \
     # 测试写入权限
     su ytdlp -c "touch /app/downloads/.test_write && rm /app/downloads/.test_write" && \
+    su ytdlp -c "touch /app/logs/.test_write && rm /app/logs/.test_write" && \
     echo "✅ 运行时下载模式配置完成，权限测试通过"
 
 # 切换用户
