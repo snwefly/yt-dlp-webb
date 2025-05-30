@@ -1,0 +1,193 @@
+name: 多策略并行构建
+
+on:
+  workflow_dispatch:
+    inputs:
+      strategies:
+        description: '要构建的策略 (用逗号分隔)'
+        required: false
+        default: 'hybrid,build-time'
+        type: string
+      
+      ytdlp_source:
+        description: 'yt-dlp 源类型'
+        required: false
+        default: 'github_release'
+        type: choice
+        options:
+          - 'github_release'
+          - 'pypi'
+          - 'local'
+      
+      ytdlp_version:
+        description: 'yt-dlp 版本'
+        required: false
+        default: 'latest'
+        type: string
+      
+      push_to_registry:
+        description: '是否推送到镜像仓库'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # 策略矩阵准备
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    
+    steps:
+    - name: 设置构建矩阵
+      id: set-matrix
+      run: |
+        STRATEGIES="${{ github.event.inputs.strategies || 'hybrid,build-time' }}"
+        
+        # 转换为 JSON 数组
+        MATRIX_JSON="["
+        IFS=',' read -ra STRATEGY_ARRAY <<< "$STRATEGIES"
+        for i in "${!STRATEGY_ARRAY[@]}"; do
+          STRATEGY="${STRATEGY_ARRAY[$i]// /}"  # 去除空格
+          
+          # 验证策略
+          case $STRATEGY in
+            "build-time"|"runtime"|"hybrid"|"local")
+              if [ $i -gt 0 ]; then
+                MATRIX_JSON="$MATRIX_JSON,"
+              fi
+              MATRIX_JSON="$MATRIX_JSON\"$STRATEGY\""
+              ;;
+            *)
+              echo "⚠️ 跳过不支持的策略: $STRATEGY"
+              ;;
+          esac
+        done
+        MATRIX_JSON="$MATRIX_JSON]"
+        
+        echo "matrix={\"strategy\":$MATRIX_JSON}" >> $GITHUB_OUTPUT
+        echo "🔧 构建矩阵: $MATRIX_JSON"
+
+  # 并行构建多种策略
+  build-strategies:
+    runs-on: ubuntu-latest
+    needs: prepare-matrix
+    if: needs.prepare-matrix.outputs.matrix != '{"strategy":[]}'
+    
+    strategy:
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+      fail-fast: false
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: 检出代码库
+      uses: actions/checkout@v4
+    
+    - name: 配置策略参数
+      id: config
+      run: |
+        STRATEGY="${{ matrix.strategy }}"
+        
+        case $STRATEGY in
+          "build-time")
+            echo "dockerfile=Dockerfile.build-time" >> $GITHUB_OUTPUT
+            echo "requirements=requirements.github.txt" >> $GITHUB_OUTPUT
+            ;;
+          "runtime")
+            echo "dockerfile=Dockerfile.runtime" >> $GITHUB_OUTPUT
+            echo "requirements=requirements.runtime.txt" >> $GITHUB_OUTPUT
+            ;;
+          "hybrid")
+            echo "dockerfile=Dockerfile.hybrid" >> $GITHUB_OUTPUT
+            echo "requirements=requirements.hybrid.txt" >> $GITHUB_OUTPUT
+            ;;
+          "local")
+            echo "dockerfile=Dockerfile.local" >> $GITHUB_OUTPUT
+            echo "requirements=requirements.local.txt" >> $GITHUB_OUTPUT
+            ;;
+        esac
+        
+        echo "✅ 策略配置完成: $STRATEGY"
+    
+    - name: 设置 Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: 登录容器注册表
+      if: github.event.inputs.push_to_registry == 'true'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: 提取元数据
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=raw,value=${{ matrix.strategy }}-latest
+          type=raw,value=${{ matrix.strategy }}-{{date 'YYYYMMDD-HHmmss'}}
+        labels: |
+          org.opencontainers.image.title=YT-DLP Web (${{ matrix.strategy }})
+          org.opencontainers.image.description=yt-dlp Web界面 - ${{ matrix.strategy }} 构建模式
+          build.strategy=${{ matrix.strategy }}
+          ytdlp.source=${{ github.event.inputs.ytdlp_source }}
+          ytdlp.version=${{ github.event.inputs.ytdlp_version }}
+    
+    - name: 构建 Docker 镜像 (${{ matrix.strategy }})
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ steps.config.outputs.dockerfile }}
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event.inputs.push_to_registry == 'true' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          BUILDTIME=${{ github.run_id }}
+          VERSION=multi-${{ github.run_number }}
+          REVISION=${{ github.sha }}
+          YTDLP_SOURCE=${{ github.event.inputs.ytdlp_source }}
+          YTDLP_VERSION=${{ github.event.inputs.ytdlp_version }}
+        cache-from: type=gha,scope=${{ matrix.strategy }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.strategy }}
+    
+    - name: 构建结果 (${{ matrix.strategy }})
+      run: |
+        echo "✅ ${{ matrix.strategy }} 策略构建完成"
+        echo "📦 镜像标签: ${{ steps.meta.outputs.tags }}"
+
+  # 构建摘要
+  summary:
+    runs-on: ubuntu-latest
+    needs: [prepare-matrix, build-strategies]
+    if: always()
+    
+    steps:
+    - name: 构建摘要
+      run: |
+        echo "🎉 多策略构建完成！"
+        echo ""
+        echo "📋 构建信息:"
+        echo "  🏗️ 请求的策略: ${{ github.event.inputs.strategies }}"
+        echo "  📦 yt-dlp 源: ${{ github.event.inputs.ytdlp_source }}"
+        echo "  🏷️ yt-dlp 版本: ${{ github.event.inputs.ytdlp_version }}"
+        echo "  🚀 推送状态: ${{ github.event.inputs.push_to_registry }}"
+        echo ""
+        
+        # 检查构建状态
+        if [ "${{ needs.build-strategies.result }}" == "success" ]; then
+          echo "✅ 所有策略构建成功"
+        elif [ "${{ needs.build-strategies.result }}" == "failure" ]; then
+          echo "❌ 部分策略构建失败"
+        else
+          echo "⚠️ 构建状态: ${{ needs.build-strategies.result }}"
+        fi
