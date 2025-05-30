@@ -50,8 +50,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
 COPY webapp /app/webapp
-COPY ../yt_dlp /app/yt_dlp
-COPY start.sh /app/
+COPY yt_dlp /app/yt_dlp
+COPY start.sh /app/start.sh
 
 # 验证项目结构
 RUN echo "验证项目结构..." && \
@@ -62,12 +62,15 @@ RUN echo "验证项目结构..." && \
 
 # 确保启动脚本使用正确的行尾符号并设置执行权限
 RUN dos2unix /app/start.sh && \
-    chmod +x /app/start.sh
+    chmod +x /app/start.sh && \
+    echo "start.sh 权限设置完成" && \
+    ls -la /app/start.sh
 
 # 创建必要目录并设置权限
 RUN mkdir -p /app/downloads /app/config /app/logs \
     && chown -R ytdlp:ytdlp /app \
-    && chmod 755 /app/downloads /app/config /app/logs
+    && chmod 775 /app/downloads /app/config /app/logs \
+    && chmod g+s /app/downloads
 
 # 切换到非root用户
 USER ytdlp
