@@ -134,3 +134,62 @@ def api_session_info():
     except Exception as e:
         logger.error(f"获取会话信息时发生错误: {e}")
         return jsonify({'error': str(e)}), 500
+
+@auth_bp.route('/api/auth/change-password', methods=['POST'])
+def api_change_password():
+    """修改密码"""
+    try:
+        # 检查认证
+        auth_token = request.headers.get('Authorization')
+        if auth_token and auth_token.startswith('Bearer '):
+            token = auth_token.split(' ')[1]
+            if not auth_manager.verify_session(token):
+                return jsonify({'error': '会话无效'}), 401
+            username = auth_manager.get_session_user(token)
+        elif 'auth_token' in session:
+            if not auth_manager.verify_session(session['auth_token']):
+                return jsonify({'error': '会话无效'}), 401
+            username = auth_manager.get_session_user(session['auth_token'])
+        else:
+            return jsonify({'error': '未登录'}), 401
+
+        # 只有管理员可以修改密码
+        if username != auth_manager.admin_username:
+            return jsonify({'error': '权限不足'}), 403
+
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '无效的请求数据'}), 400
+
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        confirm_password = data.get('confirm_password')
+
+        if not current_password or not new_password or not confirm_password:
+            return jsonify({'error': '所有字段都是必填的'}), 400
+
+        # 验证当前密码
+        if not auth_manager.verify_credentials(username, current_password):
+            return jsonify({'error': '当前密码错误'}), 400
+
+        # 验证新密码确认
+        if new_password != confirm_password:
+            return jsonify({'error': '新密码和确认密码不匹配'}), 400
+
+        # 密码强度验证
+        if len(new_password) < 6:
+            return jsonify({'error': '新密码长度至少6位'}), 400
+
+        # 修改密码
+        if auth_manager.change_password(username, new_password):
+            logger.info(f"用户 {username} 成功修改密码")
+            return jsonify({
+                'success': True,
+                'message': '密码修改成功'
+            })
+        else:
+            return jsonify({'error': '密码修改失败'}), 500
+
+    except Exception as e:
+        logger.error(f"修改密码时发生错误: {e}")
+        return jsonify({'error': str(e)}), 500

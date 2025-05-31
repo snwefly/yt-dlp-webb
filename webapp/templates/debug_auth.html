@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证调试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-section {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 yt-dlp Web 认证调试工具</h1>
+    
+    <div class="debug-section">
+        <h3>📋 当前状态</h3>
+        <div id="current-status"></div>
+        <button onclick="checkCurrentStatus()">刷新状态</button>
+    </div>
+
+    <div class="debug-section">
+        <h3>🔑 Token 检查</h3>
+        <div id="token-status"></div>
+        <button onclick="checkToken()">检查 Token</button>
+        <button onclick="clearToken()">清除 Token</button>
+    </div>
+
+    <div class="debug-section">
+        <h3>🍪 Session 检查</h3>
+        <div id="session-status"></div>
+        <button onclick="checkSession()">检查 Session</button>
+    </div>
+
+    <div class="debug-section">
+        <h3>🧪 API 测试</h3>
+        <div id="api-test-status"></div>
+        <button onclick="testDownloadAPI()">测试下载 API</button>
+        <button onclick="testInfoAPI()">测试信息 API</button>
+    </div>
+
+    <div class="debug-section">
+        <h3>🔄 重新登录</h3>
+        <div>
+            <input type="text" id="username" placeholder="用户名" value="admin">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="reLogin()">重新登录</button>
+        </div>
+        <div id="login-status"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>📊 详细日志</h3>
+        <div id="debug-log"></div>
+        <button onclick="clearLog()">清除日志</button>
+    </div>
+
+    <script>
+        let debugLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.push(`[${timestamp}] ${message}`);
+            updateLogDisplay();
+            
+            const statusDiv = document.getElementById('debug-log');
+            const logEntry = document.createElement('div');
+            logEntry.className = `status ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            statusDiv.appendChild(logEntry);
+        }
+
+        function updateLogDisplay() {
+            const logDiv = document.getElementById('debug-log');
+            if (debugLog.length > 20) {
+                // 只保留最新的20条日志
+                debugLog = debugLog.slice(-20);
+                logDiv.innerHTML = '';
+            }
+        }
+
+        function clearLog() {
+            debugLog = [];
+            document.getElementById('debug-log').innerHTML = '';
+        }
+
+        async function checkCurrentStatus() {
+            log('开始检查当前状态...', 'info');
+            
+            const statusDiv = document.getElementById('current-status');
+            statusDiv.innerHTML = '';
+
+            // 检查 localStorage
+            const token = localStorage.getItem('auth_token');
+            const tokenStatus = token ? '✅ 存在' : '❌ 不存在';
+            statusDiv.innerHTML += `<div class="status info">LocalStorage Token: ${tokenStatus}</div>`;
+            
+            // 检查当前页面
+            const currentPage = window.location.pathname;
+            statusDiv.innerHTML += `<div class="status info">当前页面: ${currentPage}</div>`;
+            
+            // 检查用户控件
+            const userControls = document.querySelector('[data-user-controls]');
+            const userControlsStatus = userControls ? '✅ 已显示' : '❌ 未显示';
+            statusDiv.innerHTML += `<div class="status info">用户控件: ${userControlsStatus}</div>`;
+
+            log('当前状态检查完成', 'success');
+        }
+
+        async function checkToken() {
+            log('开始检查 Token...', 'info');
+            
+            const statusDiv = document.getElementById('token-status');
+            statusDiv.innerHTML = '';
+
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                statusDiv.innerHTML = '<div class="status error">❌ 没有找到 Token</div>';
+                log('Token 不存在', 'error');
+                return;
+            }
+
+            statusDiv.innerHTML += `<div class="status info">Token: ${token.substring(0, 20)}...</div>`;
+
+            try {
+                const response = await fetch('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                log(`Token 验证响应: ${response.status}`, 'info');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML += `<div class="status success">✅ Token 有效</div>`;
+                    statusDiv.innerHTML += `<div class="status info">用户: ${data.username}</div>`;
+                    statusDiv.innerHTML += `<div class="status info">管理员: ${data.is_admin ? '是' : '否'}</div>`;
+                    log(`Token 验证成功: ${data.username}`, 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    statusDiv.innerHTML += `<div class="status error">❌ Token 无效: ${response.status}</div>`;
+                    statusDiv.innerHTML += `<div class="status error">错误: ${errorData.error || '未知错误'}</div>`;
+                    log(`Token 验证失败: ${response.status} - ${errorData.error}`, 'error');
+                }
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="status error">❌ 网络错误: ${error.message}</div>`;
+                log(`Token 验证网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkSession() {
+            log('开始检查 Session...', 'info');
+            
+            const statusDiv = document.getElementById('session-status');
+            statusDiv.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/auth/verify', {
+                    credentials: 'include'
+                });
+
+                log(`Session 验证响应: ${response.status}`, 'info');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML += `<div class="status success">✅ Session 有效</div>`;
+                    statusDiv.innerHTML += `<div class="status info">用户: ${data.username}</div>`;
+                    log(`Session 验证成功: ${data.username}`, 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    statusDiv.innerHTML += `<div class="status error">❌ Session 无效: ${response.status}</div>`;
+                    log(`Session 验证失败: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                statusDiv.innerHTML += `<div class="status error">❌ 网络错误: ${error.message}</div>`;
+                log(`Session 验证网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDownloadAPI() {
+            log('测试下载 API...', 'info');
+            
+            const statusDiv = document.getElementById('api-test-status');
+            statusDiv.innerHTML = '<div class="status info">正在测试下载 API...</div>';
+
+            const token = localStorage.getItem('auth_token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                        video_quality: 'best',
+                        audio_quality: 'best',
+                        output_format: 'mp4'
+                    })
+                });
+
+                log(`下载 API 响应: ${response.status}`, 'info');
+
+                if (response.status === 401) {
+                    statusDiv.innerHTML = '<div class="status error">❌ 认证失败 - 需要重新登录</div>';
+                    log('下载 API 认证失败', 'error');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = '<div class="status success">✅ 下载 API 可用</div>';
+                    log('下载 API 测试成功', 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    statusDiv.innerHTML = `<div class="status warning">⚠️ API 错误: ${errorData.error || response.status}</div>`;
+                    log(`下载 API 错误: ${errorData.error}`, 'warning');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ 网络错误: ${error.message}</div>`;
+                log(`下载 API 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testInfoAPI() {
+            log('测试信息 API...', 'info');
+            
+            const statusDiv = document.getElementById('api-test-status');
+            statusDiv.innerHTML = '<div class="status info">正在测试信息 API...</div>';
+
+            const token = localStorage.getItem('auth_token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            try {
+                const response = await fetch('/api/info', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+                    })
+                });
+
+                log(`信息 API 响应: ${response.status}`, 'info');
+
+                if (response.status === 401) {
+                    statusDiv.innerHTML = '<div class="status error">❌ 认证失败 - 需要重新登录</div>';
+                    log('信息 API 认证失败', 'error');
+                } else if (response.ok) {
+                    statusDiv.innerHTML = '<div class="status success">✅ 信息 API 可用</div>';
+                    log('信息 API 测试成功', 'success');
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    statusDiv.innerHTML = `<div class="status warning">⚠️ API 错误: ${errorData.error || response.status}</div>`;
+                    log(`信息 API 错误: ${errorData.error}`, 'warning');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ 网络错误: ${error.message}</div>`;
+                log(`信息 API 网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function reLogin() {
+            log('开始重新登录...', 'info');
+            
+            const statusDiv = document.getElementById('login-status');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                statusDiv.innerHTML = '<div class="status error">❌ 请输入用户名和密码</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+
+                log(`登录响应: ${response.status}`, 'info');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('auth_token', data.token);
+                    statusDiv.innerHTML = '<div class="status success">✅ 登录成功</div>';
+                    log(`登录成功: ${data.username}`, 'success');
+                    
+                    // 清空密码
+                    document.getElementById('password').value = '';
+                    
+                    // 重新检查状态
+                    setTimeout(() => {
+                        checkCurrentStatus();
+                        checkToken();
+                    }, 1000);
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    statusDiv.innerHTML = `<div class="status error">❌ 登录失败: ${errorData.error || response.status}</div>`;
+                    log(`登录失败: ${errorData.error}`, 'error');
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">❌ 网络错误: ${error.message}</div>`;
+                log(`登录网络错误: ${error.message}`, 'error');
+            }
+        }
+
+        function clearToken() {
+            localStorage.removeItem('auth_token');
+            document.getElementById('token-status').innerHTML = '<div class="status warning">⚠️ Token 已清除</div>';
+            log('Token 已清除', 'warning');
+        }
+
+        // 页面加载时自动检查状态
+        window.addEventListener('load', () => {
+            log('调试工具已加载', 'info');
+            checkCurrentStatus();
+        });
+    </script>
+</body>
+</html>

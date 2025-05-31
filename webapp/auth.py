@@ -6,9 +6,13 @@
 import os
 import hashlib
 import secrets
+import logging
+import json
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify, session, redirect, url_for
+
+logger = logging.getLogger(__name__)
 
 class AuthManager:
     """认证管理器"""
@@ -16,9 +20,12 @@ class AuthManager:
     def __init__(self):
         # 默认管理员账号（可通过环境变量配置）
         self.admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
-        self.admin_password_hash = self._hash_password(
-            os.environ.get('ADMIN_PASSWORD', 'admin123')
-        )
+
+        # 密码配置文件路径
+        self.password_config_file = '/app/config/admin_password.json'
+
+        # 加载密码（优先从配置文件，然后从环境变量）
+        self.admin_password_hash = self._load_password()
 
         # 会话配置 - 支持环境变量配置
         # 默认30天，可通过环境变量 SESSION_TIMEOUT_DAYS 配置
@@ -45,11 +52,67 @@ class AuthManager:
         """密码哈希"""
         return hashlib.sha256(password.encode()).hexdigest()
 
+    def _load_password(self):
+        """加载密码（优先从配置文件，然后从环境变量）"""
+        try:
+            # 尝试从配置文件加载
+            if os.path.exists(self.password_config_file):
+                with open(self.password_config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    if 'password_hash' in config:
+                        logger.info("从配置文件加载管理员密码")
+                        return config['password_hash']
+        except Exception as e:
+            logger.warning(f"加载密码配置文件失败: {e}")
+
+        # 从环境变量加载
+        password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        logger.info("从环境变量加载管理员密码")
+        return self._hash_password(password)
+
+    def _save_password(self, password_hash):
+        """保存密码到配置文件"""
+        try:
+            # 确保配置目录存在
+            os.makedirs(os.path.dirname(self.password_config_file), exist_ok=True)
+
+            config = {
+                'password_hash': password_hash,
+                'updated_at': datetime.now().isoformat(),
+                'updated_by': self.admin_username
+            }
+
+            with open(self.password_config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+
+            logger.info("密码已保存到配置文件")
+            return True
+        except Exception as e:
+            logger.error(f"保存密码配置文件失败: {e}")
+            return False
+
     def verify_credentials(self, username, password):
         """验证用户凭据"""
         if username == self.admin_username:
             password_hash = self._hash_password(password)
             return password_hash == self.admin_password_hash
+        return False
+
+    def change_password(self, username, new_password):
+        """修改密码"""
+        if username == self.admin_username:
+            # 生成新的密码哈希
+            new_password_hash = self._hash_password(new_password)
+
+            # 保存到配置文件
+            if self._save_password(new_password_hash):
+                # 更新内存中的密码哈希
+                self.admin_password_hash = new_password_hash
+                logger.info(f"管理员密码已永久更新")
+                return True
+            else:
+                logger.error("密码保存失败")
+                return False
         return False
 
     def create_session(self, username):

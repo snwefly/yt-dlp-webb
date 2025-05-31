@@ -922,6 +922,9 @@
 
                 // 显示用户信息
                 displayUserInfo();
+
+                // 显示欢迎消息
+                showMessage('欢迎使用 yt-dlp Web 界面！您已成功登录，可以开始下载视频。', 'success');
             });
         });
 
@@ -1270,10 +1273,10 @@
                 if (response.status === 401) {
                     console.warn('认证失败，清除token并跳转到登录页');
                     localStorage.removeItem('auth_token');
-                    showMessage('会话已过期，请重新登录', 'error');
+                    showMessage('会话已过期，正在跳转到登录页...', 'warning');
                     setTimeout(() => {
-                        window.location.href = '/login';
-                    }, 2000);
+                        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    }, 1500);
                     throw new Error('Authentication failed');
                 }
 

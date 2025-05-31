@@ -29,6 +29,11 @@ def admin():
     """管理员控制台"""
     return render_template('admin.html')
 
+@main_bp.route('/debug')
+def debug():
+    """认证调试页面"""
+    return render_template('debug_auth.html')
+
 @main_bp.route('/health')
 def health_check():
     """健康检查端点"""
