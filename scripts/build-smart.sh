@@ -42,17 +42,17 @@ show_help() {
 yt-dlp 配置:
   --source SOURCE           yt-dlp 源类型 (github_release|pypi|local)
                             默认: $DEFAULT_YTDLP_SOURCE
-  
+
   --version VERSION         yt-dlp 版本
                             默认: $DEFAULT_YTDLP_VERSION
 
 构建选项:
   -t, --tag TAG            Docker 镜像标签
                             默认: $DEFAULT_IMAGE_TAG
-  
+
   -e, --env ENV            环境类型 (development|production|testing)
                             默认: 根据策略自动选择
-  
+
   --no-cache               不使用 Docker 缓存
   --push                   构建后推送镜像
   --test                   构建后运行测试
@@ -116,21 +116,21 @@ interactive_select() {
     echo "4) local       - 纯本地模式（离线环境）"
     echo
     read -p "请输入选择 (1-4) [默认: 3]: " choice
-    
+
     case $choice in
         1) STRATEGY="build-time" ;;
         2) STRATEGY="runtime" ;;
         3|"") STRATEGY="hybrid" ;;
         4) STRATEGY="local" ;;
-        *) 
+        *)
             log_error "无效选择，使用默认策略: hybrid"
             STRATEGY="hybrid"
             ;;
     esac
-    
+
     echo
     log_info "已选择策略: $STRATEGY"
-    
+
     # 询问 yt-dlp 源
     echo
     echo "请选择 yt-dlp 源："
@@ -139,22 +139,22 @@ interactive_select() {
     echo "3) local         - 本地文件"
     echo
     read -p "请输入选择 (1-3) [默认: 1]: " source_choice
-    
+
     case $source_choice in
         1|"") YTDLP_SOURCE="github_release" ;;
         2) YTDLP_SOURCE="pypi" ;;
         3) YTDLP_SOURCE="local" ;;
-        *) 
+        *)
             log_warning "无效选择，使用默认源: github_release"
             YTDLP_SOURCE="github_release"
             ;;
     esac
-    
+
     # 询问版本
     echo
     read -p "请输入 yt-dlp 版本 [默认: latest]: " version_input
     YTDLP_VERSION=${version_input:-"latest"}
-    
+
     echo
     log_success "配置完成："
     log_info "  策略: $STRATEGY"
@@ -187,7 +187,7 @@ parse_args() {
     PUSH_IMAGE=false
     RUN_TEST=false
     INTERACTIVE=false
-    
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             -s|--strategy)
@@ -254,7 +254,7 @@ setup_config() {
     if [ "$INTERACTIVE" = true ]; then
         interactive_select
     fi
-    
+
     # 验证策略
     case $STRATEGY in
         build-time|runtime|hybrid|local)
@@ -265,7 +265,7 @@ setup_config() {
             exit 1
             ;;
     esac
-    
+
     # 设置 Dockerfile
     case $STRATEGY in
         build-time)
@@ -285,7 +285,7 @@ setup_config() {
             REQUIREMENTS_FILE="requirements.local.txt"
             ;;
     esac
-    
+
     # 设置环境（如果未指定）
     if [ -z "$ENVIRONMENT" ]; then
         case $STRATEGY in
@@ -295,16 +295,16 @@ setup_config() {
             local) ENVIRONMENT="development" ;;
         esac
     fi
-    
+
     # 更新镜像标签
     IMAGE_TAG="${IMAGE_TAG}:${STRATEGY}"
-    
+
     # 验证必要文件
     if [ ! -f "$DOCKERFILE" ]; then
         log_error "Dockerfile 不存在: $DOCKERFILE"
         exit 1
     fi
-    
+
     # 显示配置
     if [ "${SHOW_CONFIG:-false}" = true ]; then
         show_config
@@ -315,15 +315,15 @@ setup_config() {
 # 执行构建
 build_image() {
     log_header "开始构建 Docker 镜像"
-    
+
     # 显示配置
     show_config
-    
+
     # 生成构建信息
     BUILDTIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     VERSION=${VERSION:-"1.0.0-$(date +%Y%m%d)"}
     REVISION=${REVISION:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
-    
+
     # 构建参数
     local build_args=(
         --build-arg "BUILDTIME=$BUILDTIME"
@@ -335,11 +335,11 @@ build_image() {
         -t "$IMAGE_TAG"
         -f "$DOCKERFILE"
     )
-    
+
     if [ -n "$NO_CACHE" ]; then
         build_args+=("$NO_CACHE")
     fi
-    
+
     # 添加标签
     build_args+=(
         --label "build.strategy=$STRATEGY"
@@ -347,14 +347,14 @@ build_image() {
         --label "ytdlp.version=$YTDLP_VERSION"
         --label "build.environment=$ENVIRONMENT"
     )
-    
+
     log_info "执行构建命令:"
     echo "docker build ${build_args[*]} ."
     echo
-    
+
     if docker build "${build_args[@]}" .; then
         log_success "Docker 镜像构建成功: $IMAGE_TAG"
-        
+
         # 显示镜像信息
         echo
         log_info "镜像信息:"
@@ -369,28 +369,41 @@ build_image() {
 run_tests() {
     if [ "$RUN_TEST" = true ]; then
         log_header "运行构建测试"
-        
+
         local container_name="ytdlp-test-$(date +%s)"
-        
+
         log_info "启动测试容器..."
         if docker run --rm --name "$container_name" \
             -e ENVIRONMENT=testing \
             -p 8080:8080 \
             -d "$IMAGE_TAG"; then
-            
+
             log_info "等待容器启动..."
-            sleep 15
-            
-            # 健康检查
-            if curl -f http://localhost:8080/health >/dev/null 2>&1; then
-                log_success "健康检查通过"
-            else
-                log_error "健康检查失败"
+
+            # 使用轮询而不是固定延迟
+            local max_attempts=30
+            local attempt=1
+            local health_check_passed=false
+
+            while [ $attempt -le $max_attempts ]; do
+                if curl -f http://localhost:8080/health >/dev/null 2>&1; then
+                    log_success "健康检查通过 (尝试 $attempt/$max_attempts)"
+                    health_check_passed=true
+                    break
+                fi
+
+                log_info "等待容器启动... ($attempt/$max_attempts)"
+                sleep 2
+                attempt=$((attempt + 1))
+            done
+
+            if [ "$health_check_passed" = false ]; then
+                log_error "健康检查失败 - 容器启动超时"
                 docker logs "$container_name"
                 docker stop "$container_name"
                 exit 1
             fi
-            
+
             # 停止测试容器
             docker stop "$container_name"
             log_success "测试完成"
@@ -405,7 +418,7 @@ run_tests() {
 push_image() {
     if [ "$PUSH_IMAGE" = true ]; then
         log_header "推送镜像到注册表"
-        
+
         if docker push "$IMAGE_TAG"; then
             log_success "镜像推送成功: $IMAGE_TAG"
         else
@@ -418,19 +431,19 @@ push_image() {
 # 主函数
 main() {
     log_header "智能构建脚本启动"
-    
+
     parse_args "$@"
     setup_config
     build_image
     run_tests
     push_image
-    
+
     echo
     log_success "🎉 构建完成！"
     log_info "镜像标签: $IMAGE_TAG"
     log_info "构建策略: $STRATEGY"
     log_info "yt-dlp 源: $YTDLP_SOURCE ($YTDLP_VERSION)"
-    
+
     echo
     log_info "启动命令:"
     echo "docker run -d -p 8080:8080 --name yt-dlp-web $IMAGE_TAG"
