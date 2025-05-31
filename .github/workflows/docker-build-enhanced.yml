@@ -55,6 +55,12 @@ on:
         default: true
         type: boolean
 
+      clear_cache:
+        description: '是否清除构建缓存（强制重建）'
+        required: false
+        default: false
+        type: boolean
+
       environment:
         description: '环境类型'
         required: false
@@ -214,6 +220,14 @@ jobs:
     - name: 设置 Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    - name: 清除构建缓存
+      if: github.event.inputs.clear_cache == 'true'
+      run: |
+        echo "🧹 清除 GitHub Actions 构建缓存..."
+        # 清除 Docker buildx 缓存
+        docker buildx prune -f
+        echo "✅ 缓存清除完成，将进行完全重建"
+
     - name: 登录容器注册表
       if: github.event.inputs.push_to_registry == 'true'
       uses: docker/login-action@v3
@@ -242,7 +256,8 @@ jobs:
           ytdlp.source=${{ github.event.inputs.ytdlp_source || 'github_release' }}
           ytdlp.version=${{ github.event.inputs.ytdlp_version || 'latest' }}
 
-    - name: 构建并推送 Docker 镜像
+    - name: 构建并推送 Docker 镜像（使用缓存）
+      if: github.event.inputs.clear_cache != 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -254,6 +269,19 @@ jobs:
         build-args: ${{ needs.prepare.outputs.build_args }}
         cache-from: type=gha,scope=${{ needs.prepare.outputs.image_suffix }}
         cache-to: type=gha,mode=max,scope=${{ needs.prepare.outputs.image_suffix }}
+
+    - name: 构建并推送 Docker 镜像（无缓存强制重建）
+      if: github.event.inputs.clear_cache == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ needs.prepare.outputs.dockerfile }}
+        platforms: ${{ github.event.inputs.build_platforms || 'linux/amd64,linux/arm64' }}
+        push: ${{ github.event.inputs.push_to_registry == 'true' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: ${{ needs.prepare.outputs.build_args }}
+        no-cache: true
 
     - name: 构建结果摘要
       run: |
@@ -282,7 +310,8 @@ jobs:
     - name: 设置 Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: 构建测试镜像
+    - name: 构建测试镜像（使用缓存）
+      if: github.event.inputs.clear_cache != 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -293,6 +322,19 @@ jobs:
         load: true
         build-args: ${{ needs.prepare.outputs.build_args }}
         cache-from: type=gha,scope=${{ needs.prepare.outputs.image_suffix }}
+
+    - name: 构建测试镜像（无缓存）
+      if: github.event.inputs.clear_cache == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ needs.prepare.outputs.dockerfile }}
+        platforms: linux/amd64
+        push: false
+        tags: test-image:latest
+        load: true
+        build-args: ${{ needs.prepare.outputs.build_args }}
+        no-cache: true
 
     - name: 运行容器测试
       run: |
@@ -369,11 +411,20 @@ jobs:
         INFO_RESPONSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
           "http://localhost:8080/api/info?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
-        if echo "$INFO_RESPONSE" | grep -q '"success":true'; then
+        # 检查响应是否包含视频信息（而不是 success 字段）
+        if echo "$INFO_RESPONSE" | grep -q '"title":'; then
           echo "✅ 视频信息 API 测试通过"
+          # 显示获取到的视频标题
+          TITLE=$(echo "$INFO_RESPONSE" | grep -o '"title":"[^"]*"' | cut -d'"' -f4)
+          echo "📋 视频标题: $TITLE"
         else
           echo "⚠️ 视频信息 API 测试失败（可能是网络问题）"
           echo "响应: $INFO_RESPONSE"
+          # 检查是否是错误响应
+          if echo "$INFO_RESPONSE" | grep -q '"error":'; then
+            ERROR_MSG=$(echo "$INFO_RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+            echo "❌ 错误信息: $ERROR_MSG"
+          fi
         fi
 
     - name: 清理测试容器
