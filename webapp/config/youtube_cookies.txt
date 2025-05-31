@@ -1,0 +1,9 @@
+# Netscape HTTP Cookie File
+# This is a generated file! Do not edit.
+
+# YouTube基础cookies - 根据官方FAQ配置以避免bot检测
+# 格式: domain	domain_specified	path	secure	expiration	name	value
+.youtube.com	TRUE	/	TRUE	1767225600	CONSENT	YES+cb.20210328-17-p0.en+FX+667
+.youtube.com	TRUE	/	FALSE	1767225600	PREF	tz=UTC&hl=en&f1=50000000
+.youtube.com	TRUE	/	TRUE	1767225600	SOCS	CAI
+.youtube.com	TRUE	/	FALSE	1767225600	VISITOR_INFO1_LIVE	fPQ4jCL6EiE

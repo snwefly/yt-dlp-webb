@@ -7,6 +7,9 @@ from flask import Blueprint, jsonify, request
 from ..auth import admin_required
 from ..file_cleaner import get_cleanup_manager
 import logging
+import os
+import subprocess
+import sys
 
 logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__)
@@ -83,4 +86,72 @@ def cleanup_config():
 
     except Exception as e:
         logger.error(f"清理配置操作失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/version', methods=['GET'])
+@admin_required
+def get_version_info():
+    """获取版本信息"""
+    try:
+        # 获取 yt-dlp 版本
+        try:
+            result = subprocess.run([sys.executable, '-m', 'yt_dlp', '--version'],
+                                  capture_output=True, text=True, timeout=10)
+            ytdlp_version = result.stdout.strip() if result.returncode == 0 else '未知'
+        except Exception:
+            ytdlp_version = '未知'
+
+        # 获取 Python 版本
+        python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+        # 获取应用版本（可以从环境变量或配置文件读取）
+        app_version = os.environ.get('APP_VERSION', '1.0.0')
+
+        return jsonify({
+            'success': True,
+            'version_info': {
+                'app_version': app_version,
+                'ytdlp_version': ytdlp_version,
+                'python_version': python_version,
+                'last_updated': '未知'  # 可以后续添加实际的更新时间
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取版本信息失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/update-check', methods=['GET'])
+@admin_required
+def check_update():
+    """检查更新"""
+    try:
+        # 这里可以实现实际的更新检查逻辑
+        # 目前返回一个模拟的响应
+        return jsonify({
+            'success': True,
+            'update_available': False,
+            'current_version': os.environ.get('APP_VERSION', '1.0.0'),
+            'latest_version': os.environ.get('APP_VERSION', '1.0.0'),
+            'message': '当前已是最新版本'
+        })
+
+    except Exception as e:
+        logger.error(f"检查更新失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/update', methods=['POST'])
+@admin_required
+def start_update():
+    """开始更新"""
+    try:
+        # 这里可以实现实际的更新逻辑
+        # 目前返回一个模拟的响应
+        return jsonify({
+            'success': True,
+            'message': '更新功能暂未实现'
+        })
+
+    except Exception as e:
+        logger.error(f"开始更新失败: {e}")
         return jsonify({'error': str(e)}), 500

@@ -226,17 +226,10 @@ class YtdlpManager:
             raise RuntimeError(f"无法创建下载器: {e}")
 
     def get_enhanced_options(self):
-        """获取增强的 yt-dlp 选项"""
+        """获取简化的 yt-dlp 选项 - 让yt-dlp自己处理复杂性"""
         return {
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web'],
-                    'player_skip': ['webpage'],
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+            # 完全使用yt-dlp默认配置，不添加任何额外选项
+            # 这样yt-dlp会自动处理YouTube等网站的复杂性，就像命令行一样
         }
 
 # 全局实例

@@ -39,12 +39,40 @@ def create_app():
     """创建Flask应用"""
     app = Flask(__name__)
 
+    # 配置日志 - 确保输出到容器日志
+    if not app.debug:
+        import logging
+        from logging.config import dictConfig
+
+        dictConfig({
+            'version': 1,
+            'formatters': {
+                'default': {
+                    'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+                }
+            },
+            'handlers': {
+                'wsgi': {
+                    'class': 'logging.StreamHandler',
+                    'stream': 'ext://flask.logging.wsgi_errors_stream',
+                    'formatter': 'default'
+                }
+            },
+            'root': {
+                'level': 'INFO',
+                'handlers': ['wsgi']
+            }
+        })
+
+        app.logger.info('🚀 Flask 应用已启动，日志系统已配置')
+
     # 配置应用
     app.config.update(
         SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key-change-this'),
         DOWNLOAD_FOLDER=os.environ.get('DOWNLOAD_FOLDER', '/app/downloads'),
         MAX_CONTENT_LENGTH=16 * 1024 * 1024 * 1024,  # 16GB
-        PERMANENT_SESSION_LIFETIME=timedelta(hours=24)
+        # 增加session超时时间到30天，与AuthManager保持一致
+        PERMANENT_SESSION_LIFETIME=timedelta(days=int(os.environ.get('SESSION_TIMEOUT_DAYS', '30')))
     )
 
     # 设置日志

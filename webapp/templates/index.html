@@ -3,376 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>yt-dlp 高级网页界面</title>
+    <title>yt-dlp Web 下载器</title>
+
+    <!-- 认证状态元数据 -->
+    <meta name="auth-status" content="{{ 'true' if is_authenticated else 'false' }}">
+    <meta name="current-user" content="{{ current_user or '' }}">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Animate.css -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             min-height: 100vh;
-            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            position: relative;
             overflow: hidden;
         }
 
-        .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-
-        .header::before {
-            content: '';
+        .user-controls {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="40" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="80" r="1.5" fill="rgba(255,255,255,0.1)"/></svg>');
+            top: 20px;
+            right: 20px;
+            z-index: 10;
         }
 
-        .header h1 {
-            font-size: 2.8em;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .header p {
-            opacity: 0.9;
-            font-size: 1.2em;
-            position: relative;
-            z-index: 1;
-        }
-
-        .main-content {
-            padding: 40px;
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 30px;
-        }
-
-        .left-panel {
-            min-width: 0;
-        }
-
-        .right-panel {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 25px;
-            height: fit-content;
-            border: 1px solid #e9ecef;
-        }
-
-        .input-section {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 30px;
-            border: 1px solid #e9ecef;
-        }
-
-        .input-group {
-            margin-bottom: 20px;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
+        .btn-custom {
+            border-radius: 25px;
+            padding: 12px 30px;
             font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .input-group input, .input-group select {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-            background: white;
-        }
-
-        .input-group input:focus, .input-group select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .url-input-container {
-            position: relative;
-        }
-
-        .url-validation {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 20px;
-        }
-
-        .url-validation.valid {
-            color: #27ae60;
-        }
-
-        .url-validation.invalid {
-            color: #e74c3c;
-        }
-
-        .tabs {
-            display: flex;
-            border-bottom: 2px solid #e9ecef;
-            margin-bottom: 20px;
-        }
-
-        .tab {
-            padding: 12px 20px;
-            background: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
             border: none;
-            cursor: pointer;
-            font-weight: 600;
-            color: #7f8c8d;
-            transition: all 0.3s;
-            border-bottom: 3px solid transparent;
         }
 
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
         }
 
-        .tab-content {
-            display: none;
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
 
-        .tab-content.active {
-            display: block;
-        }
-
-        .format-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .preset-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .preset-btn {
-            padding: 12px;
+        .form-control-custom {
+            border-radius: 15px;
             border: 2px solid #e9ecef;
-            background: white;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-align: center;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .preset-btn:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
-        }
-
-        .preset-btn.active {
-            border-color: #667eea;
-            background: #667eea;
-            color: white;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .checkbox-group input[type="checkbox"] {
-            margin-right: 10px;
-            transform: scale(1.2);
-        }
-
-        .checkbox-group label {
-            font-weight: 500;
-            color: #2c3e50;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        button {
-            flex: 1;
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
+            padding: 15px 20px;
             font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
         }
 
-        .btn-primary {
-            background: #667eea;
-            color: white;
+        .form-control-custom:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
 
-        .btn-primary:hover {
-            background: #5a6fd8;
-            transform: translateY(-2px);
+        .card-custom {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
         }
 
-        .btn-secondary {
-            background: #95a5a6;
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #7f8c8d;
-            transform: translateY(-2px);
-        }
-
-        .btn-success {
-            background: #27ae60;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #229954;
-            transform: translateY(-2px);
-        }
-
-        .status-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .status-section.show {
-            display: block;
-        }
-
-        .video-info {
-            background: #e8f4fd;
-            border-left: 4px solid #3498db;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 0 8px 8px 0;
-        }
-
-        .video-info h3 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-
-        .video-info p {
-            margin-bottom: 5px;
-            color: #555;
-        }
-
-        .progress-bar {
-            width: 100%;
+        .progress-custom {
             height: 25px;
-            background: #e0e0e0;
-            border-radius: 12px;
-            overflow: hidden;
-            margin: 15px 0;
-            position: relative;
+            border-radius: 15px;
+            background: #e9ecef;
         }
 
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            width: 0%;
-            transition: width 0.3s;
-            position: relative;
+        .progress-bar-custom {
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 15px;
         }
 
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 14px;
-        }
-
-        .download-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
-        }
-
-        .stat-item {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e9ecef;
-        }
-
-        .stat-value {
-            font-size: 1.5em;
-            font-weight: 600;
-            color: #667eea;
-        }
-
-        .stat-label {
-            font-size: 0.9em;
-            color: #7f8c8d;
-            margin-top: 5px;
-        }
-
-        .downloads-section {
-            margin-top: 30px;
-        }
-
-        .download-item {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid #667eea;
-        }
-
-        .download-item.completed {
-            border-left-color: #27ae60;
-        }
-
-        .download-item.error {
-            border-left-color: #e74c3c;
-        }
-
-        .loading {
+        .loading-spinner {
             display: inline-block;
             width: 20px;
             height: 20px;
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border-top: 3px solid var(--primary-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -382,1166 +116,688 @@
             100% { transform: rotate(360deg); }
         }
 
-        .hidden {
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .status-section {
             display: none;
         }
 
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #e74c3c;
-        }
-
-        .success-message {
-            background: #efe;
-            color: #363;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #27ae60;
-        }
-
-        /* iOS快捷指令样式 */
-        .shortcuts-section {
-            margin-top: 30px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 30px;
-            border: 1px solid #e9ecef;
-        }
-
-        .shortcuts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .shortcut-card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
-            border: 2px solid #e9ecef;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .shortcut-card:hover {
-            border-color: #667eea;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.15);
-        }
-
-        .shortcut-icon {
-            font-size: 3em;
-            margin-bottom: 15px;
+        .status-section.show {
             display: block;
         }
 
-        .shortcut-card h4 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 1.3em;
-        }
-
-        .shortcut-card p {
-            color: #7f8c8d;
-            margin-bottom: 20px;
-            font-size: 0.95em;
-            line-height: 1.4;
-        }
-
-        .shortcut-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .btn-shortcut {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-
-        .btn-shortcut:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-shortcut-guide {
-            background: #95a5a6;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 13px;
-        }
-
-        .btn-shortcut-guide:hover {
-            background: #7f8c8d;
-            transform: translateY(-1px);
-        }
-
-        .shortcuts-info {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            border-left: 4px solid #667eea;
-        }
-
-        .shortcuts-info h4 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: 1.2em;
-        }
-
-        .shortcuts-info ol {
-            margin-bottom: 25px;
-            padding-left: 20px;
-        }
-
-        .shortcuts-info li {
-            margin-bottom: 8px;
-            color: #555;
-            line-height: 1.5;
-        }
-
-        .server-config {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
-        }
-
-        .server-config code {
-            background: #e9ecef;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-family: 'Monaco', 'Consolas', monospace;
-            color: #667eea;
-            font-weight: 600;
-        }
-
-        /* 弹窗样式 */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 30px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e9ecef;
-        }
-
-        .modal-header h3 {
-            color: #2c3e50;
-            margin: 0;
-        }
-
-        .close {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        .close:hover {
-            color: #667eea;
-        }
-
-        .guide-content {
-            line-height: 1.6;
-        }
-
-        .guide-content h4 {
-            color: #667eea;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }
-
-        .guide-content code {
-            background: #f8f9fa;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: monospace;
-        }
-
-        .guide-content pre {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;
-            border-left: 4px solid #667eea;
-        }
-
-        @media (max-width: 1024px) {
-            .main-content {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-
-            .format-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .shortcuts-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .shortcut-buttons {
-                flex-direction: row;
-            }
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>yt-dlp 高级网页界面</h1>
-            <p>功能强大的视频下载工具 - 支持数千个网站</p>
-        </div>
-
-        <div class="main-content">
-            <div class="left-panel">
-                <!-- URL输入区域 -->
-                <div class="input-section">
-                    <div class="input-group">
-                        <label for="url">视频链接：</label>
-                        <div class="url-input-container">
-                            <input type="url" id="url" placeholder="https://www.youtube.com/watch?v=... 或其他支持的网站链接" required>
-                            <span id="url-validation" class="url-validation"></span>
-                        </div>
-                    </div>
-
-                    <!-- 快速预设 -->
-                    <div class="preset-buttons">
-                        <div class="preset-btn active" data-preset="best">最佳质量</div>
-                        <div class="preset-btn" data-preset="mp4">MP4视频</div>
-                        <div class="preset-btn" data-preset="mp3">MP3音频</div>
-                        <div class="preset-btn" data-preset="720p">720P视频</div>
-                        <div class="preset-btn" data-preset="480p">480P视频</div>
-                        <div class="preset-btn" data-preset="custom">自定义</div>
-                    </div>
-
-                    <div class="button-group">
-                        <button type="button" class="btn-secondary" onclick="getVideoInfo()">
-                            <span id="info-btn-text">获取视频信息</span>
-                            <span id="info-loading" class="loading hidden"></span>
-                        </button>
-                        <button type="button" class="btn-primary" onclick="startDownload()">
-                            <span id="download-btn-text">开始下载</span>
-                            <span id="download-loading" class="loading hidden"></span>
-                        </button>
-                    </div>
+    <div class="container-fluid py-4">
+        <div class="main-container mx-auto" style="max-width: 1200px;">
+            <!-- Header -->
+            <div class="header-section p-5 text-center position-relative">
+                <div class="user-controls" id="userControls">
+                    <!-- 用户控件将通过 JavaScript 动态添加 -->
                 </div>
-
-                <div id="message-area"></div>
-
-                <!-- 视频信息显示 -->
-                <div id="video-info-section" class="status-section">
-                    <div id="video-info" class="video-info"></div>
-                </div>
-
-                <!-- 下载状态 -->
-                <div id="download-status-section" class="status-section">
-                    <h3>下载状态</h3>
-                    <div id="download-status"></div>
-                    <div id="progress-container" class="hidden">
-                        <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill"></div>
-                            <div id="progress-text" class="progress-text">0%</div>
-                        </div>
-                        <div id="download-stats" class="download-stats">
-                            <div class="stat-item">
-                                <div id="download-speed" class="stat-value">0 KB/s</div>
-                                <div class="stat-label">下载速度</div>
-                            </div>
-                            <div class="stat-item">
-                                <div id="file-size" class="stat-value">0 MB</div>
-                                <div class="stat-label">文件大小</div>
-                            </div>
-                            <div class="stat-item">
-                                <div id="eta" class="stat-value">--:--</div>
-                                <div class="stat-label">剩余时间</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- iOS快捷指令下载区域 -->
-                <div class="shortcuts-section">
-                    <h3>📱 iOS快捷指令</h3>
-                    <p style="color: #7f8c8d; margin-bottom: 20px;">一键安装，在iPhone/iPad上直接下载视频</p>
-
-                    <div class="shortcuts-grid">
-                        <div class="shortcut-card">
-                            <div class="shortcut-icon">🎬</div>
-                            <h4>智能视频下载器</h4>
-                            <p>支持格式选择的交互式下载器</p>
-                            <div class="shortcut-buttons">
-                                <button class="btn-shortcut" onclick="downloadShortcut('smart_downloader')">
-                                    📥 下载快捷指令
-                                </button>
-                                <button class="btn-shortcut-guide" onclick="showShortcutGuide('smart_downloader')">
-                                    📖 使用说明
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="shortcut-card">
-                            <div class="shortcut-icon">🎵</div>
-                            <h4>音频提取器</h4>
-                            <p>一键提取视频音频为MP3</p>
-                            <div class="shortcut-buttons">
-                                <button class="btn-shortcut" onclick="downloadShortcut('audio_extractor')">
-                                    📥 下载快捷指令
-                                </button>
-                                <button class="btn-shortcut-guide" onclick="showShortcutGuide('audio_extractor')">
-                                    📖 使用说明
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="shortcut-card">
-                            <div class="shortcut-icon">📱</div>
-                            <h4>720P下载器</h4>
-                            <p>专门下载720P高清视频</p>
-                            <div class="shortcut-buttons">
-                                <button class="btn-shortcut" onclick="downloadShortcut('720p_downloader')">
-                                    📥 下载快捷指令
-                                </button>
-                                <button class="btn-shortcut-guide" onclick="showShortcutGuide('720p_downloader')">
-                                    📖 使用说明
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="shortcut-card">
-                            <div class="shortcut-icon">⚡</div>
-                            <h4>批量下载器</h4>
-                            <p>支持多个视频批量下载</p>
-                            <div class="shortcut-buttons">
-                                <button class="btn-shortcut" onclick="downloadShortcut('batch_downloader')">
-                                    📥 下载快捷指令
-                                </button>
-                                <button class="btn-shortcut-guide" onclick="showShortcutGuide('batch_downloader')">
-                                    📖 使用说明
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="shortcuts-info">
-                        <h4>📋 安装步骤：</h4>
-                        <ol>
-                            <li>点击上方"📥 下载快捷指令"按钮</li>
-                            <li>在弹出的页面中选择"用快捷指令打开"</li>
-                            <li>点击"添加快捷指令"完成安装</li>
-                            <li>复制视频链接，运行快捷指令即可下载</li>
-                        </ol>
-
-                        <div class="server-config">
-                            <h4>🔧 服务器配置：</h4>
-                            <p>当前服务器地址：<code id="server-address">http://localhost:8080</code></p>
-                            <button class="btn-secondary" onclick="updateServerAddress()">更新服务器地址</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 下载历史 -->
-                <div class="downloads-section">
-                    <h3>下载历史</h3>
-                    <div id="downloads-list"></div>
-                </div>
+                <h1 class="display-4 fw-bold mb-3">
+                    <i class="fas fa-download me-3"></i>yt-dlp Web 下载器
+                </h1>
+                <p class="lead mb-0">强大的视频下载工具，支持多平台视频下载</p>
             </div>
 
-            <!-- 右侧面板 - 高级选项 -->
-            <div class="right-panel">
-                <h3 style="margin-bottom: 20px; color: #2c3e50;">高级选项</h3>
+            <!-- Main Content -->
+            <div class="p-4">
+                <div class="row g-4">
+                    <!-- Left Panel - Download Form -->
+                    <div class="col-lg-8">
+                        <div class="card card-custom h-100">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-4">
+                                    <i class="fas fa-link me-2"></i>视频下载
+                                </h5>
 
-                <div class="tabs">
-                    <button class="tab active" data-tab="format">格式</button>
-                    <button class="tab" data-tab="options">选项</button>
-                </div>
+                                <!-- URL Input -->
+                                <div class="mb-4">
+                                    <label for="url" class="form-label fw-semibold">视频链接</label>
+                                    <div class="input-group">
+                                        <input type="url" class="form-control form-control-custom"
+                                               id="url" placeholder="请输入视频链接...">
+                                        <button class="btn btn-outline-secondary" type="button" id="pasteBtn">
+                                            <i class="fas fa-paste"></i>
+                                        </button>
+                                    </div>
+                                </div>
 
-                <!-- 格式选择标签页 -->
-                <div id="format-tab" class="tab-content active">
-                    <div class="format-grid">
-                        <div class="input-group">
-                            <label for="video-quality">视频质量：</label>
-                            <select id="video-quality">
-                                <option value="best">最佳质量</option>
-                                <option value="worst">最低质量</option>
-                                <option value="1080">1080p</option>
-                                <option value="720">720p</option>
-                                <option value="480">480p</option>
-                                <option value="360">360p</option>
-                            </select>
+                                <!-- Action Buttons -->
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-6">
+                                        <button type="button" class="btn btn-outline-primary btn-custom w-100"
+                                                id="getInfoBtn">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <span id="infoText">获取视频信息</span>
+                                            <span id="infoSpinner" class="loading-spinner ms-2 d-none"></span>
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <button type="button" class="btn btn-primary-custom btn-custom w-100"
+                                                id="downloadBtn">
+                                            <i class="fas fa-download me-2"></i>
+                                            <span id="downloadText">开始下载</span>
+                                            <span id="downloadSpinner" class="loading-spinner ms-2 d-none"></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Message Area -->
+                                <div id="messageArea"></div>
+
+                                <!-- Video Info -->
+                                <div id="video-info-section" class="status-section d-none mt-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="fas fa-video me-2"></i>视频信息
+                                            </h6>
+                                            <div id="video-info"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Download Status -->
+                                <div id="download-status-section" class="status-section d-none mt-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="fas fa-tasks me-2"></i>下载状态
+                                            </h6>
+                                            <div id="download-status"></div>
+
+                                            <!-- Progress Container -->
+                                            <div id="progress-container" class="d-none mt-3">
+                                                <div class="progress progress-custom mb-3">
+                                                    <div class="progress-bar progress-bar-custom"
+                                                         id="progress-fill" role="progressbar" style="width: 0%">
+                                                        <span id="progress-text">0%</span>
+                                                    </div>
+                                                </div>
+                                                <div class="row g-3 text-center">
+                                                    <div class="col-4">
+                                                        <small class="text-muted">下载速度</small>
+                                                        <div id="download-speed" class="fw-bold">0 KB/s</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">文件大小</small>
+                                                        <div id="file-size" class="fw-bold">0 MB</div>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <small class="text-muted">剩余时间</small>
+                                                        <div id="eta" class="fw-bold">--:--</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Recent Downloads -->
+                                <div class="mt-4">
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="fas fa-history me-2"></i>最近下载
+                                            </h6>
+                                            <div id="downloads-list"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
 
-                        <div class="input-group">
-                            <label for="audio-quality">音频质量：</label>
-                            <select id="audio-quality">
-                                <option value="best">最佳质量</option>
-                                <option value="worst">最低质量</option>
-                                <option value="320">320 kbps</option>
-                                <option value="256">256 kbps</option>
-                                <option value="192">192 kbps</option>
-                                <option value="128">128 kbps</option>
-                            </select>
+                    <!-- Right Panel - Options -->
+                    <div class="col-lg-4">
+                        <div class="card card-custom h-100">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-4">
+                                    <i class="fas fa-cog me-2"></i>下载选项
+                                </h5>
+
+                                <!-- Quality Options -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">视频质量</label>
+                                    <select class="form-select" id="video-quality">
+                                        <option value="best">最佳质量</option>
+                                        <option value="worst">最低质量</option>
+                                        <option value="1080">1080p</option>
+                                        <option value="720">720p</option>
+                                        <option value="480">480p</option>
+                                        <option value="360">360p</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">音频质量</label>
+                                    <select class="form-select" id="audio-quality">
+                                        <option value="best">最佳质量</option>
+                                        <option value="worst">最低质量</option>
+                                        <option value="320">320 kbps</option>
+                                        <option value="256">256 kbps</option>
+                                        <option value="192">192 kbps</option>
+                                        <option value="128">128 kbps</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">输出格式</label>
+                                    <select class="form-select" id="output-format">
+                                        <option value="best">自动选择</option>
+                                        <option value="mp4">MP4 (视频)</option>
+                                        <option value="webm">WebM (视频)</option>
+                                        <option value="mkv">MKV (视频)</option>
+                                        <option value="mp3">MP3 (音频)</option>
+                                        <option value="aac">AAC (音频)</option>
+                                        <option value="flac">FLAC (音频)</option>
+                                        <option value="wav">WAV (音频)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Additional Options -->
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="audio-only">
+                                        <label class="form-check-label" for="audio-only">
+                                            仅提取音频
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="download-subtitles">
+                                        <label class="form-check-label" for="download-subtitles">
+                                            下载字幕
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="download-thumbnail">
+                                        <label class="form-check-label" for="download-thumbnail">
+                                            下载缩略图
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="download-description">
+                                        <label class="form-check-label" for="download-description">
+                                            下载描述
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="download-playlist">
+                                        <label class="form-check-label" for="download-playlist">
+                                            下载整个播放列表
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">字幕语言</label>
+                                    <select class="form-select" id="subtitle-lang">
+                                        <option value="all">所有可用语言</option>
+                                        <option value="zh">中文</option>
+                                        <option value="en">英文</option>
+                                        <option value="ja">日文</option>
+                                        <option value="ko">韩文</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="output-format">输出格式：</label>
-                        <select id="output-format">
-                            <option value="best">自动选择</option>
-                            <option value="mp4">MP4 (视频)</option>
-                            <option value="webm">WebM (视频)</option>
-                            <option value="mkv">MKV (视频)</option>
-                            <option value="mp3">MP3 (音频)</option>
-                            <option value="aac">AAC (音频)</option>
-                            <option value="flac">FLAC (音频)</option>
-                            <option value="wav">WAV (音频)</option>
-                        </select>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="audio-only">
-                        <label for="audio-only">仅提取音频</label>
-                    </div>
-                </div>
-
-                <!-- 选项标签页 -->
-                <div id="options-tab" class="tab-content">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="download-subtitles">
-                        <label for="download-subtitles">下载字幕</label>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="download-thumbnail">
-                        <label for="download-thumbnail">下载缩略图</label>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="download-description">
-                        <label for="download-description">下载描述</label>
-                    </div>
-
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="download-playlist">
-                        <label for="download-playlist">下载整个播放列表</label>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="subtitle-lang">字幕语言：</label>
-                        <select id="subtitle-lang">
-                            <option value="all">所有可用语言</option>
-                            <option value="zh">中文</option>
-                            <option value="en">英文</option>
-                            <option value="ja">日文</option>
-                            <option value="ko">韩文</option>
-                        </select>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 快捷指令使用说明弹窗 -->
-    <div id="shortcut-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-title">快捷指令使用说明</h3>
-                <span class="close" onclick="closeModal()">&times;</span>
-            </div>
-            <div id="modal-body" class="guide-content">
-                <!-- 内容将通过JavaScript动态加载 -->
-            </div>
-        </div>
-    </div>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
     <script>
-        let currentDownloadId = null;
-        let statusCheckInterval = null;
-        let currentPreset = 'best';
+        // 全局变量 - 从服务器端获取
+        let isAuthenticated = false;
+        let currentUser = null;
 
-        // 初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            // 首先检查认证状态
-            checkAuthStatus().then(isAuthenticated => {
-                if (!isAuthenticated) {
-                    // 未认证，重定向到登录页
-                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-                    return;
-                }
+        // 从页面元数据获取认证状态
+        try {
+            const authMeta = document.querySelector('meta[name="auth-status"]');
+            const userMeta = document.querySelector('meta[name="current-user"]');
 
-                // 已认证，继续初始化
-                initializeTabs();
-                initializePresets();
-                initializeUrlValidation();
-                loadRecentDownloads();
-                initializeShortcuts();
-
-                // 显示用户信息
-                displayUserInfo();
-
-                // 显示欢迎消息
-                showMessage('欢迎使用 yt-dlp Web 界面！您已成功登录，可以开始下载视频。', 'success');
-            });
-        });
-
-        // 检查认证状态（改进版）
-        async function checkAuthStatus() {
-            try {
-                // 1. 优先检查localStorage中的token
-                const token = localStorage.getItem('auth_token');
-                if (token) {
-                    console.log('🔍 检查Token认证...');
-                    const response = await fetch('/api/auth/verify', {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.valid) {
-                            console.log('✅ Token认证成功:', data.username);
-                            return true;
-                        }
-                    }
-
-                    // token无效，清除
-                    console.log('⚠️ Token无效，清除localStorage');
-                    localStorage.removeItem('auth_token');
-                }
-
-                // 2. 检查session认证
-                console.log('🔍 检查Session认证...');
-                const sessionResponse = await fetch('/api/auth/verify', {
-                    method: 'GET',
-                    credentials: 'include'  // 确保发送cookies
-                });
-
-                if (sessionResponse.ok) {
-                    const data = await sessionResponse.json();
-                    if (data.valid) {
-                        console.log('✅ Session认证成功:', data.username);
-                        return true;
-                    }
-                }
-
-                console.log('❌ 认证失败，需要登录');
-                return false;
-
-            } catch (error) {
-                console.error('❌ 认证检查异常:', error);
-                return false;
+            if (authMeta) {
+                isAuthenticated = authMeta.content === 'true';
             }
+            if (userMeta && userMeta.content) {
+                currentUser = userMeta.content;
+            }
+        } catch (e) {
+            console.log('无法从元数据获取认证状态，使用默认值');
         }
 
-        // 显示用户信息
-        async function displayUserInfo() {
-            try {
-                const token = localStorage.getItem('auth_token');
-                console.log('Token found:', !!token);
-                if (!token) return;
+        // 备用方法：检查 localStorage 中的 token
+        const token = localStorage.getItem('auth_token');
+        if (token && !isAuthenticated) {
+            // 如果有 token 但服务器端认为未认证，可能是 token 过期
+            console.log('检测到 localStorage token，但服务器端未认证');
+        }
 
-                const response = await fetch('/api/auth/verify', {
+        // 获取有效的认证token
+        function getAuthToken() {
+            const token = localStorage.getItem('auth_token');
+            console.log('🔑 获取认证token:', token ? `存在(${token.substring(0, 10)}...)` : '不存在');
+            return token;
+        }
+
+        // 检查认证状态
+        function isUserAuthenticated() {
+            const token = getAuthToken();
+            const authenticated = (token && token.length > 0) || isAuthenticated;
+            console.log('🔐 用户认证状态:', {
+                hasToken: !!token,
+                serverAuth: isAuthenticated,
+                finalAuth: authenticated
+            });
+            return authenticated;
+        }
+
+        // 验证token有效性
+        async function validateToken() {
+            const token = getAuthToken();
+            if (!token) {
+                console.log('🔍 没有token，跳过验证');
+                return false;
+            }
+
+            try {
+                console.log('🔍 验证token有效性...');
+                const response = await axios.get('/api/auth/verify', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
 
-                console.log('Auth verify response:', response.status);
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Auth data:', data);
-                    if (data.valid && data.username) {
-                        // 在页面头部添加用户信息和登出按钮
-                        console.log('Adding user controls for:', data.username);
-                        addUserControls(data.username);
-                    } else {
-                        console.warn('Invalid auth data or missing username');
-                    }
+                if (response.data.valid) {
+                    console.log('✅ Token验证成功');
+                    return true;
                 } else {
-                    console.warn('Auth verify failed:', response.status);
+                    console.log('❌ Token验证失败，清除无效token');
+                    localStorage.removeItem('auth_token');
+                    return false;
                 }
             } catch (error) {
-                console.error('Failed to get user info:', error);
-            }
-        }
-
-        // 添加用户控制区域
-        function addUserControls(username) {
-            const header = document.querySelector('.header');
-            console.log('Header element found:', !!header);
-
-            // 检查是否已经存在用户控制区域
-            const existingControls = header?.querySelector('[data-user-controls]');
-            if (existingControls) {
-                console.log('Removing existing user controls');
-                existingControls.remove();
-            }
-
-            const userControls = document.createElement('div');
-            userControls.setAttribute('data-user-controls', 'true');
-            userControls.style.cssText = `
-                position: absolute;
-                top: 20px;
-                right: 30px;
-                color: white;
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                z-index: 10;
-            `;
-
-            userControls.innerHTML = `
-                <span style="opacity: 0.9;">👤 ${username}</span>
-                <button onclick="window.open('/admin', '_blank')" style="
-                    background: rgba(255,255,255,0.2);
-                    color: white;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    padding: 8px 15px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    transition: all 0.3s;
-                    margin-right: 10px;
-                " onmouseover="this.style.background='rgba(255,255,255,0.3)'"
-                   onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                    ⚙️ 配置
-                </button>
-                <button onclick="logout()" style="
-                    background: rgba(255,255,255,0.2);
-                    color: white;
-                    border: 1px solid rgba(255,255,255,0.3);
-                    padding: 8px 15px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    transition: all 0.3s;
-                " onmouseover="this.style.background='rgba(255,255,255,0.3)'"
-                   onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                    🚪 登出
-                </button>
-            `;
-
-            if (header) {
-                header.appendChild(userControls);
-                console.log('User controls added successfully');
-
-                // 验证按钮是否正确添加
-                const configButton = userControls.querySelector('button[onclick*="admin"]');
-                console.log('Config button found:', !!configButton);
-            } else {
-                console.error('Header element not found, cannot add user controls');
-            }
-        }
-
-        // 登出功能
-        async function logout() {
-            try {
-                const token = localStorage.getItem('auth_token');
-                if (token) {
-                    await fetch('/api/auth/logout', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Logout error:', error);
-            } finally {
-                // 清除本地存储并重定向到登录页
+                console.log('❌ Token验证出错，清除token:', error.response?.status);
                 localStorage.removeItem('auth_token');
-                window.location.href = '/login';
+                return false;
             }
         }
 
-        // 标签页功能
-        function initializeTabs() {
-            const tabs = document.querySelectorAll('.tab');
-            const tabContents = document.querySelectorAll('.tab-content');
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 页面加载完成');
+            console.log('服务器认证状态:', isAuthenticated);
+            console.log('当前用户:', currentUser);
 
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const targetTab = tab.dataset.tab;
+            // 检查 localStorage 中的 token
+            const token = getAuthToken();
 
-                    // 移除所有活动状态
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tabContents.forEach(tc => tc.classList.remove('active'));
-
-                    // 激活当前标签
-                    tab.classList.add('active');
-                    document.getElementById(targetTab + '-tab').classList.add('active');
-                });
-            });
-        }
-
-        // 预设功能
-        function initializePresets() {
-            const presetBtns = document.querySelectorAll('.preset-btn');
-
-            presetBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // 移除所有活动状态
-                    presetBtns.forEach(b => b.classList.remove('active'));
-
-                    // 激活当前预设
-                    btn.classList.add('active');
-                    currentPreset = btn.dataset.preset;
-
-                    // 应用预设配置
-                    applyPreset(currentPreset);
-                });
-            });
-        }
-
-        // 应用预设配置
-        function applyPreset(preset) {
-            const videoQuality = document.getElementById('video-quality');
-            const audioQuality = document.getElementById('audio-quality');
-            const outputFormat = document.getElementById('output-format');
-            const audioOnly = document.getElementById('audio-only');
-
-            switch(preset) {
-                case 'best':
-                    videoQuality.value = 'best';
-                    audioQuality.value = 'best';
-                    outputFormat.value = 'best';
-                    audioOnly.checked = false;
-                    break;
-                case 'mp4':
-                    videoQuality.value = 'best';
-                    audioQuality.value = 'best';
-                    outputFormat.value = 'mp4';
-                    audioOnly.checked = false;
-                    break;
-                case 'mp3':
-                    audioQuality.value = '320';
-                    outputFormat.value = 'mp3';
-                    audioOnly.checked = true;
-                    break;
-                case '720p':
-                    videoQuality.value = '720';
-                    audioQuality.value = 'best';
-                    outputFormat.value = 'mp4';
-                    audioOnly.checked = false;
-                    break;
-                case '480p':
-                    videoQuality.value = '480';
-                    audioQuality.value = 'best';
-                    outputFormat.value = 'mp4';
-                    audioOnly.checked = false;
-                    break;
-                case 'custom':
-                    // 自定义模式不改变任何设置
-                    break;
-            }
-        }
-
-        // URL验证
-        function initializeUrlValidation() {
-            const urlInput = document.getElementById('url');
-            const urlValidation = document.getElementById('url-validation');
-
-            urlInput.addEventListener('input', function() {
-                const url = this.value.trim();
-
-                if (!url) {
-                    urlValidation.textContent = '';
-                    urlValidation.className = 'url-validation';
-                    return;
+            // 如果有token但服务器端未认证，尝试验证token
+            if (token && !isAuthenticated) {
+                console.log('🔄 检测到localStorage token但服务器端未认证，尝试验证...');
+                const tokenValid = await validateToken();
+                if (tokenValid) {
+                    // Token有效，更新认证状态
+                    isAuthenticated = true;
+                    // 尝试获取用户信息
+                    try {
+                        const response = await axios.get('/api/auth/verify', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (response.data.valid) {
+                            currentUser = response.data.username;
+                            console.log('✅ 已更新用户信息:', currentUser);
+                        }
+                    } catch (error) {
+                        console.log('⚠️ 获取用户信息失败:', error);
+                    }
                 }
+            } else if (token) {
+                // 如果有token且服务器端已认证，仍然验证一下token有效性
+                await validateToken();
+            }
 
-                // 简单的URL验证
-                const urlPattern = /^https?:\/\/.+/;
-                if (urlPattern.test(url)) {
-                    urlValidation.textContent = '✓';
-                    urlValidation.className = 'url-validation valid';
+            // 初始化用户界面
+            initializeUserInterface();
+
+            // 绑定事件
+            bindEvents();
+
+            // 显示欢迎消息
+            if (isUserAuthenticated()) {
+                showMessage('欢迎使用 yt-dlp Web 下载器！', 'success');
+            } else {
+                showMessage('您正在以访客模式浏览，登录后可使用下载功能。', 'info');
+            }
+        });
+
+        // 初始化用户界面
+        function initializeUserInterface() {
+            const userControls = document.getElementById('userControls');
+            const token = localStorage.getItem('auth_token');
+
+            // 检查最新的认证状态
+            const authenticated = isUserAuthenticated();
+            const displayUser = currentUser || 'admin'; // 默认显示admin
+
+            if (authenticated) {
+                // 已登录用户界面
+                userControls.innerHTML = `
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-white-50">
+                            <i class="fas fa-user me-2"></i>${displayUser}
+                        </span>
+                        <button class="btn btn-outline-light btn-sm" onclick="window.location.href='/files'">
+                            <i class="fas fa-folder me-2"></i>文件管理
+                        </button>
+                        <button class="btn btn-outline-light btn-sm" onclick="window.location.href='/admin'">
+                            <i class="fas fa-cog me-2"></i>管理
+                        </button>
+                        <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                            <i class="fas fa-sign-out-alt me-2"></i>退出
+                        </button>
+                    </div>
+                `;
+            } else {
+                // 访客用户界面
+                userControls.innerHTML = `
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-white-50">
+                            <i class="fas fa-user-slash me-2"></i>访客模式
+                        </span>
+                        <button class="btn btn-outline-light btn-sm" onclick="window.location.href='/login'">
+                            <i class="fas fa-sign-in-alt me-2"></i>登录
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // 绑定事件
+        function bindEvents() {
+            // 粘贴按钮
+            document.getElementById('pasteBtn').addEventListener('click', async function() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    document.getElementById('url').value = text;
+                    showMessage('链接已粘贴', 'success');
+                } catch (err) {
+                    showMessage('无法访问剪贴板，请手动粘贴', 'warning');
+                }
+            });
+
+            // 获取视频信息按钮
+            document.getElementById('getInfoBtn').addEventListener('click', getVideoInfo);
+
+            // 下载按钮
+            const downloadBtn = document.getElementById('downloadBtn');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', startDownload);
+                console.log('✅ 下载按钮事件已绑定');
+            } else {
+                console.error('❌ 找不到下载按钮元素');
+            }
+        }
+
+        // 获取视频信息
+        async function getVideoInfo() {
+            // 检查认证状态
+            if (!isUserAuthenticated()) {
+                console.log('❌ 认证失败，需要登录');
+                showLoginRequired('查看视频信息');
+                return;
+            }
+
+            const token = getAuthToken();
+
+            const url = document.getElementById('url').value.trim();
+            if (!url) {
+                showMessage('请输入视频链接', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('getInfoBtn');
+            const spinner = document.getElementById('infoSpinner');
+            const text = document.getElementById('infoText');
+
+            // 显示加载状态
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            text.textContent = '获取中...';
+
+            try {
+                console.log('📤 发送视频信息请求，使用token:', token ? '存在' : '不存在');
+                const response = await axios.post('/api/info', {
+                    url: url
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.data.success) {
+                    displayVideoInfo(response.data.info);
+                    showMessage('视频信息获取成功', 'success');
                 } else {
-                    urlValidation.textContent = '✗';
-                    urlValidation.className = 'url-validation invalid';
+                    showMessage(response.data.error || '获取视频信息失败', 'error');
                 }
-            });
+            } catch (error) {
+                console.error('获取视频信息失败:', error);
+                if (error.response?.status === 401) {
+                    showLoginRequired('获取视频信息');
+                } else {
+                    showMessage('获取视频信息失败: ' + (error.response?.data?.error || error.message), 'error');
+                }
+            } finally {
+                // 恢复按钮状态
+                btn.disabled = false;
+                spinner.classList.add('d-none');
+                text.textContent = '获取视频信息';
+            }
+        }
 
-            // 回车键下载
-            urlInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    startDownload();
+        // 开始下载
+        async function startDownload() {
+            console.log('🎯 开始下载函数被调用');
+
+            // 检查认证状态
+            if (!isUserAuthenticated()) {
+                console.log('❌ 认证失败，需要登录');
+                showLoginRequired('下载视频');
+                return;
+            }
+
+            const token = getAuthToken();
+
+            const url = document.getElementById('url').value.trim();
+            if (!url) {
+                showMessage('请输入视频链接', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('downloadBtn');
+            const spinner = document.getElementById('downloadSpinner');
+            const text = document.getElementById('downloadText');
+
+            // 显示加载状态
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            text.textContent = '下载中...';
+
+            try {
+                const downloadOptions = {
+                    url: url,
+                    video_quality: document.getElementById('video-quality').value,
+                    audio_quality: document.getElementById('audio-quality').value,
+                    output_format: document.getElementById('output-format').value,
+                    audio_only: document.getElementById('audio-only').checked,
+                    download_subtitles: document.getElementById('download-subtitles').checked,
+                    download_thumbnail: document.getElementById('download-thumbnail').checked,
+                    download_description: document.getElementById('download-description').checked,
+                    download_playlist: document.getElementById('download-playlist').checked,
+                    subtitle_lang: document.getElementById('subtitle-lang').value,
+                    preset: 'custom'
+                };
+
+                console.log('📤 发送下载请求:', downloadOptions);
+                console.log('🔑 使用 token:', token ? '存在' : '不存在');
+
+                const response = await axios.post('/api/download', downloadOptions, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                console.log('📥 下载响应:', response.data);
+
+                if (response.data.success) {
+                    showMessage('下载任务已开始', 'success');
+
+                    // 显示下载状态区域
+                    const statusSection = document.getElementById('download-status-section');
+                    statusSection.classList.remove('d-none');
+                    statusSection.classList.add('show');
+
+                    // 开始监控下载进度
+                    startDownloadMonitoring(response.data.download_id);
+                } else {
+                    showMessage(response.data.error || '下载失败', 'error');
+                }
+            } catch (error) {
+                console.error('❌ 下载失败:', error);
+                console.error('错误详情:', {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data,
+                    message: error.message
+                });
+
+                if (error.response?.status === 401) {
+                    console.log('🔐 认证失败，显示登录提示');
+                    showLoginRequired('下载视频');
+                } else {
+                    const errorMsg = error.response?.data?.error || error.message || '未知错误';
+                    console.log('💥 显示错误消息:', errorMsg);
+                    showMessage('下载失败: ' + errorMsg, 'error');
+                }
+            } finally {
+                // 恢复按钮状态
+                btn.disabled = false;
+                spinner.classList.add('d-none');
+                text.textContent = '开始下载';
+            }
+        }
+
+        // 显示需要登录的提示
+        function showLoginRequired(action) {
+            Swal.fire({
+                title: '需要登录',
+                text: `请先登录以${action}`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '立即登录',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#667eea'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
                 }
             });
         }
 
         // 显示消息
         function showMessage(message, type = 'info') {
-            const messageArea = document.getElementById('message-area');
-            const className = type === 'error' ? 'error-message' : 'success-message';
-            messageArea.innerHTML = `<div class="${className}">${message}</div>`;
+            const messageArea = document.getElementById('messageArea');
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-danger',
+                'warning': 'alert-warning',
+                'info': 'alert-info'
+            }[type] || 'alert-info';
+
+            const alertHtml = `
+                <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+
+            messageArea.innerHTML = alertHtml;
+
+            // 自动隐藏消息
             setTimeout(() => {
-                messageArea.innerHTML = '';
+                const alert = messageArea.querySelector('.alert');
+                if (alert) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
             }, 5000);
-        }
-
-        // 设置加载状态
-        function setLoading(buttonId, loadingId, isLoading) {
-            const button = document.getElementById(buttonId);
-            const loading = document.getElementById(loadingId);
-
-            if (isLoading) {
-                button.classList.add('hidden');
-                loading.classList.remove('hidden');
-            } else {
-                button.classList.remove('hidden');
-                loading.classList.add('hidden');
-            }
-        }
-
-        // 获取认证头
-        function getAuthHeaders() {
-            const token = localStorage.getItem('auth_token');
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-            return headers;
-        }
-
-        // 通用 API 请求函数，自动处理认证错误
-        async function apiRequest(url, options = {}) {
-            const token = localStorage.getItem('auth_token');
-            const headers = options.headers || {};
-
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
-
-            const requestOptions = {
-                ...options,
-                headers: headers
-            };
-
-            try {
-                const response = await fetch(url, requestOptions);
-
-                // 处理认证错误
-                if (response.status === 401) {
-                    console.warn('认证失败，清除token并跳转到登录页');
-                    localStorage.removeItem('auth_token');
-                    showMessage('会话已过期，正在跳转到登录页...', 'warning');
-                    setTimeout(() => {
-                        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-                    }, 1500);
-                    throw new Error('Authentication failed');
-                }
-
-                return response;
-            } catch (error) {
-                if (error.message === 'Authentication failed') {
-                    throw error;
-                }
-                console.error('API request failed:', error);
-                throw error;
-            }
-        }
-
-        // 获取视频信息
-        async function getVideoInfo() {
-            const url = document.getElementById('url').value.trim();
-            if (!url) {
-                showMessage('请输入视频链接', 'error');
-                return;
-            }
-
-            setLoading('info-btn-text', 'info-loading', true);
-
-            try {
-                const response = await apiRequest('/api/info', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ url: url })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayVideoInfo(data);
-                    document.getElementById('video-info-section').classList.add('show');
-                } else {
-                    showMessage(data.error || '获取视频信息失败', 'error');
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed') {
-                    showMessage('网络错误：' + error.message, 'error');
-                }
-            } finally {
-                setLoading('info-btn-text', 'info-loading', false);
-            }
         }
 
         // 显示视频信息
         function displayVideoInfo(info) {
-            const videoInfoDiv = document.getElementById('video-info');
+            const videoInfoSection = document.getElementById('video-info-section');
+            const videoInfo = document.getElementById('video-info');
             const duration = info.duration ? formatDuration(info.duration) : '未知';
             const fileSize = info.filesize ? formatFileSize(info.filesize) : '未知';
 
-            videoInfoDiv.innerHTML = `
-                <h3>${info.title || '未知标题'}</h3>
-                <p><strong>上传者：</strong> ${info.uploader || '未知'}</p>
-                <p><strong>时长：</strong> ${duration}</p>
-                <p><strong>观看次数：</strong> ${info.view_count ? info.view_count.toLocaleString() : '未知'}</p>
-                <p><strong>预估大小：</strong> ${fileSize}</p>
-                ${info.description ? `<p><strong>描述：</strong> ${info.description.substring(0, 200)}...</p>` : ''}
-            `;
-        }
-
-        // 开始下载
-        async function startDownload() {
-            const url = document.getElementById('url').value.trim();
-            if (!url) {
-                showMessage('请输入视频链接', 'error');
-                return;
-            }
-
-            // 收集所有选项
-            const options = {
-                url: url,
-                video_quality: document.getElementById('video-quality').value,
-                audio_quality: document.getElementById('audio-quality').value,
-                output_format: document.getElementById('output-format').value,
-                audio_only: document.getElementById('audio-only').checked,
-                download_subtitles: document.getElementById('download-subtitles').checked,
-                download_thumbnail: document.getElementById('download-thumbnail').checked,
-                download_description: document.getElementById('download-description').checked,
-                download_playlist: document.getElementById('download-playlist').checked,
-                subtitle_lang: document.getElementById('subtitle-lang').value,
-                preset: currentPreset
-            };
-
-            setLoading('download-btn-text', 'download-loading', true);
-
-            try {
-                const response = await apiRequest('/api/download', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(options)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    currentDownloadId = data.download_id;
-                    showMessage('下载已成功开始！', 'success');
-                    document.getElementById('download-status-section').classList.add('show');
-                    startStatusCheck();
-                } else {
-                    showMessage(data.error || '开始下载失败', 'error');
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed') {
-                    showMessage('网络错误：' + error.message, 'error');
-                }
-            } finally {
-                setLoading('download-btn-text', 'download-loading', false);
-            }
-        }
-
-        // 开始状态检查
-        function startStatusCheck() {
-            if (statusCheckInterval) {
-                clearInterval(statusCheckInterval);
-            }
-            statusCheckInterval = setInterval(checkDownloadStatus, 1000);
-        }
-
-        // 检查下载状态
-        async function checkDownloadStatus() {
-            if (!currentDownloadId) return;
-
-            try {
-                const response = await apiRequest(`/api/download/${currentDownloadId}/status`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    updateDownloadStatus(data);
-
-                    if (data.status === 'completed' || data.status === 'error') {
-                        clearInterval(statusCheckInterval);
-                        statusCheckInterval = null;
-                        loadRecentDownloads();
-                    }
-                } else {
-                    console.error('Status check failed:', response.status, data);
-                    showMessage(data.error || '状态检查失败', 'error');
-                }
-            } catch (error) {
-                if (error.message === 'Authentication failed') {
-                    // 认证失败时停止状态检查
-                    clearInterval(statusCheckInterval);
-                    statusCheckInterval = null;
-                } else {
-                    console.error('Error checking download status:', error);
-                    showMessage('网络错误：' + error.message, 'error');
-                }
-            }
-        }
-
-        // 更新下载状态
-        function updateDownloadStatus(download) {
-            const statusDiv = document.getElementById('download-status');
-            const progressContainer = document.getElementById('progress-container');
-            const progressFill = document.getElementById('progress-fill');
-            const progressText = document.getElementById('progress-text');
-
-            // 状态翻译
-            const statusMap = {
-                'pending': '等待中',
-                'downloading': '下载中',
-                'completed': '已完成',
-                'error': '错误'
-            };
-
-            statusDiv.innerHTML = `
-                <p><strong>状态：</strong> ${statusMap[download.status] || download.status}</p>
-                <p><strong>链接：</strong> ${download.url}</p>
-                ${download.filename ? `<p><strong>文件：</strong> <a href="/downloads/${download.filename}" target="_blank">${download.filename}</a></p>` : ''}
-                ${download.error ? `<p><strong>错误：</strong> ${download.error}</p>` : ''}
-            `;
-
-            if (download.status === 'downloading' && download.progress > 0) {
-                progressContainer.classList.remove('hidden');
-                progressFill.style.width = `${download.progress}%`;
-                progressText.textContent = `${Math.round(download.progress)}%`;
-
-                // 更新统计信息
-                updateDownloadStats(download);
-            } else if (download.status === 'completed') {
-                progressContainer.classList.remove('hidden');
-                progressFill.style.width = '100%';
-                progressText.textContent = '100% - 已完成';
-
-                // 清空统计信息
-                document.getElementById('download-speed').textContent = '0 KB/s';
-                document.getElementById('eta').textContent = '已完成';
-            } else {
-                progressContainer.classList.add('hidden');
-            }
-        }
-
-        // 更新下载统计
-        function updateDownloadStats(download) {
-            if (download.speed) {
-                document.getElementById('download-speed').textContent = formatSpeed(download.speed);
-            }
-            if (download.total_bytes) {
-                document.getElementById('file-size').textContent = formatFileSize(download.total_bytes);
-            }
-            if (download.eta) {
-                document.getElementById('eta').textContent = formatTime(download.eta);
-            }
-        }
-
-        // 加载最近下载
-        async function loadRecentDownloads() {
-            try {
-                const response = await apiRequest('/api/downloads');
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayRecentDownloads(data.downloads);
-                } else {
-                    console.error('Failed to load downloads:', response.status, data);
-                    showMessage(data.error || '加载下载列表失败', 'error');
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed') {
-                    console.error('Error loading recent downloads:', error);
-                    showMessage('网络错误：' + error.message, 'error');
-                }
-            }
-        }
-
-        // 显示最近下载
-        function displayRecentDownloads(downloads) {
-            const downloadsDiv = document.getElementById('downloads-list');
-
-            if (downloads.length === 0) {
-                downloadsDiv.innerHTML = '<p style="text-align: center; color: #7f8c8d;">暂无下载记录</p>';
-                return;
-            }
-
-            // 状态翻译
-            const statusMap = {
-                'pending': '等待中',
-                'downloading': '下载中',
-                'completed': '已完成',
-                'error': '错误'
-            };
-
-            const downloadItems = downloads.slice(-10).reverse().map(download => {
-                const statusClass = download.status === 'completed' ? 'completed' :
-                                  download.status === 'error' ? 'error' : '';
-
-                return `
-                    <div class="download-item ${statusClass}">
-                        <p><strong>状态：</strong> ${statusMap[download.status] || download.status}</p>
-                        <p><strong>链接：</strong> <span style="word-break: break-all;">${download.url}</span></p>
-                        ${download.filename ? `<p><strong>文件：</strong> <a href="/downloads/${download.filename}" target="_blank">${download.filename}</a></p>` : ''}
-                        <p><strong>开始时间：</strong> ${new Date(download.created_at).toLocaleString()}</p>
+            const infoHtml = `
+                <div class="row g-3">
+                    <div class="col-12">
+                        <h6 class="fw-bold">${info.title || '未知标题'}</h6>
                     </div>
-                `;
-            }).join('');
+                    <div class="col-md-6">
+                        <small class="text-muted">上传者</small>
+                        <div>${info.uploader || '未知'}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">时长</small>
+                        <div>${duration}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">观看次数</small>
+                        <div>${info.view_count ? info.view_count.toLocaleString() : '未知'}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted">预估大小</small>
+                        <div>${fileSize}</div>
+                    </div>
+                    ${info.description ? `
+                    <div class="col-12">
+                        <small class="text-muted">描述</small>
+                        <div class="text-truncate" style="max-height: 60px; overflow: hidden;">
+                            ${info.description.substring(0, 200)}${info.description.length > 200 ? '...' : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
 
-            downloadsDiv.innerHTML = downloadItems;
+            videoInfo.innerHTML = infoHtml;
+            videoInfoSection.classList.remove('d-none');
+            videoInfoSection.classList.add('show');
         }
 
         // 工具函数
@@ -1583,161 +839,141 @@
             }
         }
 
-        // iOS快捷指令相关功能
-        function initializeShortcuts() {
-            // 自动检测服务器地址
-            const serverAddress = window.location.origin;
-            document.getElementById('server-address').textContent = serverAddress;
-        }
+        // 开始下载监控
+        function startDownloadMonitoring(downloadId) {
+            console.log('📊 开始监控下载:', downloadId);
 
-        // 下载快捷指令
-        function downloadShortcut(shortcutType) {
-            const serverAddress = document.getElementById('server-address').textContent;
-            const shortcutUrl = `${serverAddress}/api/shortcuts/download-file/${shortcutType}`;
+            const progressContainer = document.getElementById('progress-container');
+            progressContainer.classList.remove('d-none');
 
-            // 在新窗口打开下载链接
-            window.open(shortcutUrl, '_blank');
+            // 每2秒检查一次下载状态
+            const interval = setInterval(async () => {
+                try {
+                    const token = getAuthToken();
+                    const response = await axios.get(`/api/download/${downloadId}/status`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
 
-            // 显示安装提示
-            showMessage('快捷指令下载已开始，请在弹出页面中选择"用快捷指令打开"', 'success');
-        }
+                    if (response.data) {
+                        updateDownloadProgress(response.data);
 
-        // 显示快捷指令使用说明
-        function showShortcutGuide(shortcutType) {
-            const modal = document.getElementById('shortcut-modal');
-            const modalTitle = document.getElementById('modal-title');
-            const modalBody = document.getElementById('modal-body');
-
-            const guides = {
-                'smart_downloader': {
-                    title: '🎬 智能视频下载器使用说明',
-                    content: `
-                        <h4>功能特点：</h4>
-                        <ul>
-                            <li>支持格式选择菜单（最佳质量、720P、480P、MP3等）</li>
-                            <li>自动识别视频/音频类型</li>
-                            <li>智能保存到相册或文件app</li>
-                        </ul>
-
-                        <h4>使用步骤：</h4>
-                        <ol>
-                            <li>复制视频链接到剪贴板</li>
-                            <li>运行"智能视频下载器"快捷指令</li>
-                            <li>从菜单中选择下载格式</li>
-                            <li>等待下载完成，文件自动保存</li>
-                        </ol>
-
-                        <h4>支持的格式：</h4>
-                        <ul>
-                            <li>🎬 最佳质量视频 - 保存到相册</li>
-                            <li>📱 720P视频 - 保存到相册</li>
-                            <li>💾 480P视频 - 保存到相册</li>
-                            <li>🎵 高品质MP3 - 保存到文件</li>
-                            <li>🎶 标准MP3 - 保存到文件</li>
-                        </ul>
-                    `
-                },
-                'audio_extractor': {
-                    title: '🎵 音频提取器使用说明',
-                    content: `
-                        <h4>功能特点：</h4>
-                        <ul>
-                            <li>专门提取视频中的音频</li>
-                            <li>输出高品质MP3格式</li>
-                            <li>自动保存到文件app</li>
-                        </ul>
-
-                        <h4>使用步骤：</h4>
-                        <ol>
-                            <li>复制视频链接</li>
-                            <li>运行"音频提取器"快捷指令</li>
-                            <li>等待提取完成</li>
-                            <li>音频文件保存到iCloud Drive/Downloads</li>
-                        </ol>
-
-                        <h4>输出格式：</h4>
-                        <p>320kbps MP3音频，适合音乐收藏</p>
-                    `
-                },
-                '720p_downloader': {
-                    title: '📱 720P下载器使用说明',
-                    content: `
-                        <h4>功能特点：</h4>
-                        <ul>
-                            <li>专门下载720P高清视频</li>
-                            <li>适合手机观看的分辨率</li>
-                            <li>文件大小适中，节省存储空间</li>
-                        </ul>
-
-                        <h4>使用步骤：</h4>
-                        <ol>
-                            <li>复制视频链接</li>
-                            <li>运行"720P下载器"快捷指令</li>
-                            <li>等待下载完成</li>
-                            <li>视频保存到相册</li>
-                        </ol>
-
-                        <h4>适用场景：</h4>
-                        <p>手机观看、存储空间有限、网络带宽较小的情况</p>
-                    `
-                },
-                'batch_downloader': {
-                    title: '⚡ 批量下载器使用说明',
-                    content: `
-                        <h4>功能特点：</h4>
-                        <ul>
-                            <li>支持多个视频链接批量下载</li>
-                            <li>异步下载，支持大文件</li>
-                            <li>显示下载进度</li>
-                        </ul>
-
-                        <h4>使用步骤：</h4>
-                        <ol>
-                            <li>准备多个视频链接（每行一个）</li>
-                            <li>运行"批量下载器"快捷指令</li>
-                            <li>输入或粘贴链接列表</li>
-                            <li>选择下载格式</li>
-                            <li>等待所有下载完成</li>
-                        </ol>
-
-                        <h4>注意事项：</h4>
-                        <ul>
-                            <li>大量下载可能需要较长时间</li>
-                            <li>建议在WiFi环境下使用</li>
-                            <li>确保设备有足够存储空间</li>
-                        </ul>
-                    `
+                        // 如果下载完成或失败，停止监控
+                        if (response.data.status === 'completed' || response.data.status === 'failed') {
+                            clearInterval(interval);
+                            handleDownloadComplete(response.data);
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取下载状态失败:', error);
+                    clearInterval(interval);
                 }
-            };
+            }, 2000);
+        }
 
-            const guide = guides[shortcutType];
-            if (guide) {
-                modalTitle.textContent = guide.title;
-                modalBody.innerHTML = guide.content;
-                modal.style.display = 'block';
+        // 更新下载进度
+        function updateDownloadProgress(downloadData) {
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            const downloadSpeed = document.getElementById('download-speed');
+            const fileSize = document.getElementById('file-size');
+            const eta = document.getElementById('eta');
+            const downloadStatus = document.getElementById('download-status');
+
+            // 更新进度条
+            const progress = downloadData.progress || 0;
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `${progress}%`;
+
+            // 更新状态文本
+            let statusText = '';
+            switch (downloadData.status) {
+                case 'pending':
+                    statusText = '⏳ 等待开始...';
+                    break;
+                case 'downloading':
+                    statusText = '📥 正在下载...';
+                    break;
+                case 'completed':
+                    statusText = '✅ 下载完成';
+                    break;
+                case 'failed':
+                    statusText = `❌ 下载失败: ${downloadData.error || '未知错误'}`;
+                    break;
+                default:
+                    statusText = `📊 状态: ${downloadData.status}`;
+            }
+            downloadStatus.textContent = statusText;
+
+            // 更新下载信息
+            if (downloadData.speed) {
+                downloadSpeed.textContent = formatSpeed(downloadData.speed);
+            }
+
+            if (downloadData.total_bytes) {
+                fileSize.textContent = formatFileSize(downloadData.total_bytes);
+            }
+
+            if (downloadData.eta) {
+                eta.textContent = formatTime(downloadData.eta);
+            }
+
+            console.log('📊 进度更新:', {
+                progress: progress,
+                status: downloadData.status,
+                filename: downloadData.filename
+            });
+        }
+
+        // 处理下载完成
+        function handleDownloadComplete(downloadData) {
+            if (downloadData.status === 'completed') {
+                showMessage('🎉 下载完成！', 'success');
+
+                // 如果有文件名和下载链接，显示下载按钮
+                if (downloadData.filename && downloadData.download_url) {
+                    const filename = downloadData.filename.split('/').pop(); // 获取文件名
+
+                    // 在下载状态区域添加下载链接
+                    const downloadStatus = document.getElementById('download-status');
+                    downloadStatus.innerHTML = `
+                        <div class="d-flex align-items-center justify-content-between">
+                            <span>✅ 下载完成: ${filename}</span>
+                            <a href="${downloadData.download_url}"
+                               class="btn btn-success btn-sm"
+                               download="${filename}">
+                                <i class="fas fa-download me-1"></i>下载文件
+                            </a>
+                        </div>
+                    `;
+
+                    showMessage(`文件已保存: ${filename}`, 'info');
+                } else if (downloadData.filename) {
+                    const filename = downloadData.filename.split('/').pop();
+                    showMessage(`文件已保存: ${filename}`, 'info');
+                }
+            } else if (downloadData.status === 'failed') {
+                showMessage(`下载失败: ${downloadData.error || '未知错误'}`, 'error');
             }
         }
 
-        // 关闭弹窗
-        function closeModal() {
-            document.getElementById('shortcut-modal').style.display = 'none';
-        }
-
-        // 点击弹窗外部关闭
-        window.onclick = function(event) {
-            const modal = document.getElementById('shortcut-modal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        // 更新服务器地址
-        function updateServerAddress() {
-            const newAddress = prompt('请输入新的服务器地址:', document.getElementById('server-address').textContent);
-            if (newAddress && newAddress.trim()) {
-                document.getElementById('server-address').textContent = newAddress.trim();
-                showMessage('服务器地址已更新，请重新下载快捷指令', 'success');
-            }
+        // 退出登录
+        function logout() {
+            Swal.fire({
+                title: '确认退出',
+                text: '您确定要退出登录吗？',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '确认退出',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#dc3545'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    localStorage.removeItem('auth_token');
+                    window.location.href = '/login';
+                }
+            });
         }
     </script>
 </body>

@@ -34,6 +34,9 @@ def api_login():
         if auth_manager.verify_credentials(username, password):
             # 创建会话
             token = auth_manager.create_session(username)
+
+            # 设置session为permanent，确保长期有效
+            session.permanent = True
             session['auth_token'] = token
 
             logger.info(f"用户 {username} 登录成功")
@@ -192,4 +195,41 @@ def api_change_password():
 
     except Exception as e:
         logger.error(f"修改密码时发生错误: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@auth_bp.route('/api/auth/clear-all-sessions', methods=['POST'])
+def api_clear_all_sessions():
+    """清除所有会话"""
+    try:
+        # 检查认证
+        auth_token = request.headers.get('Authorization')
+        if auth_token and auth_token.startswith('Bearer '):
+            token = auth_token.split(' ')[1]
+            if not auth_manager.verify_session(token):
+                return jsonify({'error': '会话无效'}), 401
+            username = auth_manager.get_session_user(token)
+        elif 'auth_token' in session:
+            if not auth_manager.verify_session(session['auth_token']):
+                return jsonify({'error': '会话无效'}), 401
+            username = auth_manager.get_session_user(session['auth_token'])
+        else:
+            return jsonify({'error': '未登录'}), 401
+
+        # 只有管理员可以清除所有会话
+        if username != auth_manager.admin_username:
+            return jsonify({'error': '权限不足'}), 403
+
+        # 清除所有会话
+        cleared_count = auth_manager.clear_all_sessions()
+
+        logger.info(f"管理员 {username} 清除了所有会话，共清除 {cleared_count} 个会话")
+
+        return jsonify({
+            'success': True,
+            'message': f'已清除 {cleared_count} 个会话',
+            'cleared_count': cleared_count
+        })
+
+    except Exception as e:
+        logger.error(f"清除所有会话时发生错误: {e}")
         return jsonify({'error': str(e)}), 500

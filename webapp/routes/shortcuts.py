@@ -149,18 +149,33 @@ def shortcuts_download_direct():
 @login_required
 def shortcuts_get_file(download_id):
     """获取iOS快捷指令下载的文件"""
-    download_manager = get_download_manager()
-    download = download_manager.get_download(download_id)
-    
-    if not download:
-        return jsonify({'error': '下载任务不存在'}), 404
+    try:
+        download_manager = get_download_manager()
+        download = download_manager.get_download(download_id)
 
-    if download.get('status') != 'completed':
-        return jsonify({'error': '下载尚未完成'}), 400
+        if not download:
+            return jsonify({'error': '下载任务不存在'}), 404
 
-    # 这里应该返回实际的文件
-    # 暂时返回错误，需要实际的文件管理逻辑
-    return jsonify({'error': '文件获取功能待实现'}), 501
+        if download.get('status') != 'completed':
+            return jsonify({'error': '下载尚未完成'}), 400
+
+        file_path = download.get('file_path')
+        if not file_path or not os.path.exists(file_path):
+            return jsonify({'error': '文件不存在'}), 404
+
+        filename = download.get('filename', 'download')
+
+        # 返回文件
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/octet-stream'
+        )
+
+    except Exception as e:
+        logger.error(f"iOS快捷指令文件下载失败: {e}")
+        return jsonify({'error': '文件下载失败'}), 500
 
 @shortcuts_bp.route('/download-file/<shortcut_type>')
 def download_shortcut_file(shortcut_type):

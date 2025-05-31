@@ -268,9 +268,12 @@
                     if (response.ok) {
                         showSuccess('登录成功，正在跳转...');
 
-                        // 保存token到localStorage（如果选择记住登录）
-                        if (remember && data.token) {
+                        // 总是保存token到localStorage，因为前端依赖它进行认证
+                        if (data.token) {
                             localStorage.setItem('auth_token', data.token);
+                            console.log('✅ Token已保存到localStorage');
+                        } else {
+                            console.warn('⚠️ 登录响应中没有token');
                         }
 
                         // 跳转到主页或指定页面

@@ -21,8 +21,11 @@ class AuthManager:
         # 默认管理员账号（可通过环境变量配置）
         self.admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
 
+        # 配置目录
+        self.config_dir = '/app/config'
+
         # 密码配置文件路径
-        self.password_config_file = '/app/config/admin_password.json'
+        self.password_config_file = os.path.join(self.config_dir, 'admin_password.json')
 
         # 加载密码（优先从配置文件，然后从环境变量）
         self.admin_password_hash = self._load_password()
@@ -45,8 +48,31 @@ class AuthManager:
         # 活动延长的最大时间（小时）- 防止会话无限延长
         self.max_extension_hours = int(os.environ.get('MAX_SESSION_EXTENSION_HOURS', str(self.session_timeout_hours)))
 
-        # 存储活跃会话
-        self.active_sessions = {}
+        # 存储活跃会话 - 使用持久化文件存储
+        self.sessions_file = os.path.join(self.config_dir, 'sessions.json')
+
+        # 确保配置目录存在
+        try:
+            os.makedirs(self.config_dir, exist_ok=True)
+            logger.info(f"✅ 配置目录已创建: {self.config_dir}")
+
+            # 测试目录写权限
+            test_file = os.path.join(self.config_dir, '.test_write')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            logger.info(f"✅ 配置目录写权限正常")
+
+        except Exception as e:
+            logger.error(f"❌ 配置目录创建失败: {e}")
+            # 如果配置目录创建失败，使用临时目录
+            import tempfile
+            self.config_dir = tempfile.gettempdir()
+            self.sessions_file = os.path.join(self.config_dir, 'yt-dlp-sessions.json')
+            self.password_config_file = os.path.join(self.config_dir, 'yt-dlp-password.json')
+            logger.warning(f"⚠️ 使用临时目录: {self.config_dir}")
+
+        self.active_sessions = self._load_sessions()
 
     def _hash_password(self, password):
         """密码哈希"""
@@ -91,6 +117,56 @@ class AuthManager:
             logger.error(f"保存密码配置文件失败: {e}")
             return False
 
+    def _load_sessions(self):
+        """从文件加载会话数据"""
+        try:
+            if os.path.exists(self.sessions_file):
+                logger.info(f"🔄 从文件加载会话: {self.sessions_file}")
+                with open(self.sessions_file, 'r', encoding='utf-8') as f:
+                    sessions_data = json.load(f)
+
+                # 转换时间字符串为datetime对象
+                for token, session_data in sessions_data.items():
+                    if 'created_at' in session_data:
+                        session_data['created_at'] = datetime.fromisoformat(session_data['created_at'])
+                    if 'last_activity' in session_data:
+                        session_data['last_activity'] = datetime.fromisoformat(session_data['last_activity'])
+
+                logger.info(f"✅ 从文件加载了 {len(sessions_data)} 个会话")
+                return sessions_data
+            else:
+                logger.info(f"📝 会话文件不存在，创建新的会话存储: {self.sessions_file}")
+        except Exception as e:
+            logger.error(f"❌ 加载会话文件失败: {e}")
+
+        return {}
+
+    def _save_sessions(self):
+        """保存会话数据到文件"""
+        try:
+            # 确保配置目录存在
+            os.makedirs(os.path.dirname(self.sessions_file), exist_ok=True)
+
+            # 转换datetime对象为字符串
+            sessions_data = {}
+            for token, session_data in self.active_sessions.items():
+                sessions_data[token] = {
+                    'username': session_data['username'],
+                    'created_at': session_data['created_at'].isoformat(),
+                    'last_activity': session_data['last_activity'].isoformat()
+                }
+
+            with open(self.sessions_file, 'w', encoding='utf-8') as f:
+                json.dump(sessions_data, f, indent=2, ensure_ascii=False)
+
+            logger.info(f"💾 保存了 {len(sessions_data)} 个会话到文件: {self.sessions_file}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ 保存会话文件失败: {e}")
+            logger.error(f"文件路径: {self.sessions_file}")
+            logger.error(f"目录权限: {os.access(os.path.dirname(self.sessions_file), os.W_OK) if os.path.exists(os.path.dirname(self.sessions_file)) else '目录不存在'}")
+            return False
+
     def verify_credentials(self, username, password):
         """验证用户凭据"""
         if username == self.admin_username:
@@ -125,11 +201,19 @@ class AuthManager:
         }
 
         self.active_sessions[session_token] = session_data
+        # 保存到文件
+        self._save_sessions()
+        logger.info(f"创建会话: {session_token[:20]}... 用户: {username}")
         return session_token
 
     def verify_session(self, session_token):
         """验证会话有效性"""
-        if not session_token or session_token not in self.active_sessions:
+        if not session_token:
+            logger.debug("🔍 会话验证失败: 无session_token")
+            return False
+
+        if session_token not in self.active_sessions:
+            logger.debug(f"🔍 会话验证失败: token不存在 {session_token[:20]}...")
             return False
 
         session_data = self.active_sessions[session_token]
@@ -138,6 +222,7 @@ class AuthManager:
         # 检查会话是否过期
         session_age = current_time - session_data['created_at']
         if session_age > timedelta(hours=self.session_timeout_hours):
+            logger.debug(f"🔍 会话验证失败: 会话过期 {session_age} > {self.session_timeout_hours}小时")
             del self.active_sessions[session_token]
             return False
 
@@ -153,6 +238,9 @@ class AuthManager:
 
         # 更新最后活动时间
         session_data['last_activity'] = current_time
+        # 保存到文件
+        self._save_sessions()
+        logger.debug(f"✅ 会话验证成功: {session_token[:20]}... 用户: {session_data['username']}")
         return True
 
     def get_session_user(self, session_token):
@@ -188,6 +276,9 @@ class AuthManager:
         """销毁会话"""
         if session_token in self.active_sessions:
             del self.active_sessions[session_token]
+            # 保存到文件
+            self._save_sessions()
+            logger.info(f"销毁会话: {session_token[:20]}...")
 
     def cleanup_expired_sessions(self):
         """清理过期会话"""
@@ -201,7 +292,21 @@ class AuthManager:
         for token in expired_tokens:
             del self.active_sessions[token]
 
+        if expired_tokens:
+            # 保存到文件
+            self._save_sessions()
+            logger.info(f"清理了 {len(expired_tokens)} 个过期会话")
+
         return len(expired_tokens)
+
+    def clear_all_sessions(self):
+        """清除所有会话"""
+        session_count = len(self.active_sessions)
+        self.active_sessions.clear()
+        # 保存到文件
+        self._save_sessions()
+        logger.info(f"清除了所有 {session_count} 个会话")
+        return session_count
 
 # 全局认证管理器
 auth_manager = AuthManager()
@@ -215,23 +320,34 @@ def login_required(f):
 
         # 1. 优先检查 Authorization header
         auth_token = request.headers.get('Authorization')
+        logger.debug(f"🔐 认证检查 - 路径: {request.path}, Authorization头: {auth_token[:50] if auth_token else 'None'}...")
+
         if auth_token and auth_token.startswith('Bearer '):
             token = auth_token.split(' ')[1]
+            logger.debug(f"🔑 提取token: {token[:20]}...")
             if auth_manager.verify_session(token):
                 is_authenticated = True
+                logger.debug(f"✅ Bearer token认证成功")
+            else:
+                logger.debug(f"❌ Bearer token认证失败")
 
         # 2. 检查 Flask session
         if not is_authenticated and 'auth_token' in session:
+            logger.debug(f"🔍 检查Flask session")
             if auth_manager.verify_session(session['auth_token']):
                 is_authenticated = True
+                logger.debug(f"✅ Flask session认证成功")
             else:
+                logger.debug(f"❌ Flask session认证失败，清理session")
                 # 清理无效的session
                 session.clear()
 
         if is_authenticated:
+            logger.debug(f"✅ 认证成功，允许访问 {request.path}")
             return f(*args, **kwargs)
 
         # 未认证处理
+        logger.warning(f"❌ 认证失败，拒绝访问 {request.path}")
         if request.path.startswith('/api/'):
             return jsonify({'error': '需要登录', 'code': 'AUTH_REQUIRED'}), 401
 

@@ -3,7 +3,7 @@
 API 路由 - 视频信息和下载相关
 """
 
-from flask import Blueprint, request, jsonify, current_app, send_from_directory
+from flask import Blueprint, request, jsonify, current_app, send_from_directory, send_file, abort
 from ..auth import login_required
 from ..core.ytdlp_manager import get_ytdlp_manager
 from ..core.download_manager import get_download_manager
@@ -45,12 +45,11 @@ def get_video_info():
             logger.warning(f"Invalid URL attempted: {url} - {error_msg}")
             return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
 
-        # 配置 yt-dlp 选项
+        # 最简配置 - 让yt-dlp使用默认行为
         ydl_opts = {
             'quiet': True,
-            'no_warnings': True,
-            'extract_flat': False,
-            'skip_download': True,
+            'skip_download': True,  # 只获取信息，不下载
+            # 让yt-dlp使用所有默认设置，包括自动处理YouTube等网站
         }
 
         # 合并增强配置
@@ -113,25 +112,31 @@ def get_video_info():
                     })
             result['formats'] = formats
 
-        return jsonify(result)
+        return jsonify({
+            'success': True,
+            'info': result
+        })
 
     except Exception as e:
         error_msg = str(e)
         if 'Unsupported URL' in error_msg:
-            return jsonify({'error': '不支持的URL或网站'}), 400
+            return jsonify({'success': False, 'error': '不支持的URL或网站'}), 400
         elif 'Video unavailable' in error_msg:
-            return jsonify({'error': '视频不可用或已被删除'}), 400
+            return jsonify({'success': False, 'error': '视频不可用或已被删除'}), 400
         elif 'Private video' in error_msg:
-            return jsonify({'error': '私有视频，无法访问'}), 400
+            return jsonify({'success': False, 'error': '私有视频，无法访问'}), 400
         else:
             logger.error(f"获取视频信息时发生错误: {e}")
-            return jsonify({'error': f'获取视频信息失败: {error_msg}'}), 400
+            return jsonify({'success': False, 'error': f'获取视频信息失败: {error_msg}'}), 400
 
 @api_bp.route('/download', methods=['POST'])
 @login_required
 def start_download():
     """开始视频下载"""
     try:
+        from ..auth import get_current_user
+        current_user = get_current_user()
+        logger.info(f"🎬 用户 {current_user} 请求下载")
         # 确保 yt-dlp 已初始化
         ytdlp_manager = get_ytdlp_manager()
         if not ytdlp_manager.is_available():
@@ -183,8 +188,93 @@ def list_downloads():
     downloads = download_manager.get_all_downloads()
     return jsonify({'downloads': downloads})
 
+@api_bp.route('/download/<download_id>/file')
+@login_required
+def download_file_by_id(download_id):
+    """通过下载ID获取文件"""
+    try:
+        download_manager = get_download_manager()
+        download = download_manager.get_download(download_id)
+
+        if not download:
+            return jsonify({'error': '下载任务不存在'}), 404
+
+        if download.get('status') != 'completed':
+            return jsonify({'error': '下载尚未完成'}), 400
+
+        file_path = download.get('file_path')
+        if not file_path or not os.path.exists(file_path):
+            return jsonify({'error': '文件不存在'}), 404
+
+        filename = download.get('filename', 'download')
+
+        # 返回文件
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/octet-stream'
+        )
+
+    except Exception as e:
+        logger.error(f"文件下载失败: {e}")
+        return jsonify({'error': '文件下载失败'}), 500
+
 @api_bp.route('/downloads/<filename>')
 @login_required
-def download_file(filename):
-    """提供下载的文件"""
-    return send_from_directory(current_app.config['DOWNLOAD_FOLDER'], filename)
+def download_file_by_name(filename):
+    """通过文件名下载文件（兼容旧接口）"""
+    try:
+        download_folder = current_app.config['DOWNLOAD_FOLDER']
+        file_path = os.path.join(download_folder, filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': '文件不存在'}), 404
+
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/octet-stream'
+        )
+
+    except Exception as e:
+        logger.error(f"文件下载失败: {e}")
+        return jsonify({'error': '文件下载失败'}), 500
+
+@api_bp.route('/files')
+@login_required
+def list_files():
+    """列出所有已下载的文件"""
+    try:
+        download_manager = get_download_manager()
+        files = download_manager.list_downloaded_files()
+
+        # 格式化文件大小
+        for file_info in files:
+            size_bytes = file_info.get('file_size', 0)
+            if size_bytes:
+                if size_bytes < 1024:
+                    file_info['file_size_formatted'] = f"{size_bytes} B"
+                elif size_bytes < 1024 * 1024:
+                    file_info['file_size_formatted'] = f"{size_bytes / 1024:.1f} KB"
+                elif size_bytes < 1024 * 1024 * 1024:
+                    file_info['file_size_formatted'] = f"{size_bytes / (1024 * 1024):.1f} MB"
+                else:
+                    file_info['file_size_formatted'] = f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+            else:
+                file_info['file_size_formatted'] = "未知"
+
+            # 格式化创建时间
+            if file_info.get('created_at'):
+                file_info['created_at_formatted'] = file_info['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+
+        return jsonify({
+            'success': True,
+            'files': files,
+            'total': len(files)
+        })
+
+    except Exception as e:
+        logger.error(f"获取文件列表失败: {e}")
+        return jsonify({'error': '获取文件列表失败'}), 500

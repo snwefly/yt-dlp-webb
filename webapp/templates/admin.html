@@ -622,16 +622,18 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             checkAuth();
-            initializeTabs();
-            loadConfig();
-            loadStorageInfo();
-            loadVersionInfo();
-            refreshSessionInfo();
         });
 
         // 检查认证状态
         async function checkAuth() {
             try {
+                // 如果没有token，直接跳转到登录页
+                if (!authToken) {
+                    console.log('❌ 没有认证token，跳转到登录页');
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+
                 const response = await fetch('/api/auth/verify', {
                     headers: {
                         'Authorization': `Bearer ${authToken}`
@@ -641,15 +643,26 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.valid) {
+                        console.log('✅ 认证成功，用户:', data.username);
                         document.getElementById('username').textContent = data.username;
+
+                        // 认证成功后初始化其他组件
+                        initializeTabs();
+                        loadConfig();
+                        loadStorageInfo();
+                        loadVersionInfo();
+                        refreshSessionInfo();
                         return;
                     }
                 }
 
-                // 认证失败，跳转到登录页
+                // 认证失败，清除token并跳转到登录页
+                console.log('❌ 认证失败，清除token并跳转到登录页');
+                localStorage.removeItem('auth_token');
                 window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
             } catch (error) {
                 console.error('认证检查失败:', error);
+                localStorage.removeItem('auth_token');
                 window.location.href = '/login';
             }
         }
@@ -712,9 +725,13 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    updateStorageDisplay(data);
+                    if (data.success && data.storage_info) {
+                        updateStorageDisplay(data.storage_info);
+                    } else {
+                        console.error('获取存储信息失败:', data.error);
+                    }
                 } else {
-                    console.error('获取存储信息失败');
+                    console.error('获取存储信息失败，状态码:', response.status);
                 }
             } catch (error) {
                 console.error('加载存储信息失败:', error);
@@ -784,8 +801,10 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    document.getElementById('current-version').textContent = data.current_version;
-                    document.getElementById('last-update').textContent = data.last_update;
+                    if (data.success && data.version_info) {
+                        document.getElementById('current-version').textContent = data.version_info.app_version;
+                        document.getElementById('last-update').textContent = data.version_info.last_updated;
+                    }
                 }
             } catch (error) {
                 console.error('加载版本信息失败:', error);

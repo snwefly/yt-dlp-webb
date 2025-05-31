@@ -50,7 +50,27 @@
     <h1>🔍 yt-dlp Web 认证调试工具</h1>
     
     <div class="debug-section">
-        <h3>📋 当前状态</h3>
+        <h3>📋 服务器端状态</h3>
+        {% if debug_info %}
+        <div class="status info">Session有auth_token: {{ debug_info.session_has_auth_token }}</div>
+        <div class="status info">Session Token: {{ debug_info.session_auth_token }}</div>
+        <div class="status info">Session Permanent: {{ debug_info.session_permanent }}</div>
+        <div class="status {{ 'success' if debug_info.session_token_valid else 'error' }}">Token有效: {{ debug_info.session_token_valid }}</div>
+        <div class="status info">Token用户: {{ debug_info.session_token_user }}</div>
+        <div class="status info">活跃会话数: {{ debug_info.auth_manager_sessions }}</div>
+        <div class="status info">会话文件存在: {{ debug_info.sessions_file_exists }}</div>
+        <div class="status info">会话文件路径: {{ debug_info.sessions_file_path }}</div>
+        <details>
+            <summary>完整Session数据</summary>
+            <pre>{{ debug_info.session_data | tojson(indent=2) }}</pre>
+        </details>
+        {% else %}
+        <div class="status error">❌ 无法获取服务器端调试信息</div>
+        {% endif %}
+    </div>
+
+    <div class="debug-section">
+        <h3>📋 前端状态</h3>
         <div id="current-status"></div>
         <button onclick="checkCurrentStatus()">刷新状态</button>
     </div>
@@ -368,5 +388,12 @@
             checkCurrentStatus();
         });
     </script>
+
+    <div class="debug-section">
+        <h3>🔗 导航</h3>
+        <button onclick="window.location.href='/'">返回主页</button>
+        <button onclick="window.location.href='/login'">登录页面</button>
+        <button onclick="window.location.reload()">刷新调试页面</button>
+    </div>
 </body>
 </html>
