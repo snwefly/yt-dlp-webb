@@ -101,19 +101,18 @@ COPY config /app/config
 # 复制环境配置文件
 COPY .env* /app/
 
-# 只复制混合模式需要的启动脚本
-COPY scripts/start-hybrid.sh /app/start.sh
+# 复制所有脚本文件
+COPY scripts /app/scripts
 
 # 设置权限和目录（使用 root 用户运行）
-RUN dos2unix /app/start.sh && \
-    chmod +x /app/start.sh && \
+RUN dos2unix /app/scripts/start-hybrid.sh && \
     chmod +x /app/scripts/*.sh && \
     # 创建应用所需目录
     mkdir -p /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
     # 设置目录权限（root 用户拥有完全权限）
     chmod 755 /app/downloads /app/config /app/logs /app/yt-dlp-cache && \
     # 确保脚本可执行
-    chmod +x /app/start.sh /app/scripts/*.sh && \
+    chmod +x /app/scripts/*.sh && \
     # 测试写入权限
     touch /app/downloads/.test_write && rm /app/downloads/.test_write && \
     touch /app/logs/.test_write && rm /app/logs/.test_write && \
@@ -130,4 +129,4 @@ HEALTHCHECK --interval=30s --timeout=15s --start-period=45s --retries=4 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # 启动
-CMD ["/app/start.sh"]
+CMD ["/app/scripts/start-hybrid.sh"]
