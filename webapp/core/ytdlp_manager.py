@@ -226,11 +226,30 @@ class YtdlpManager:
             raise RuntimeError(f"无法创建下载器: {e}")
 
     def get_enhanced_options(self):
-        """获取简化的 yt-dlp 选项 - 让yt-dlp自己处理复杂性"""
-        return {
-            # 完全使用yt-dlp默认配置，不添加任何额外选项
-            # 这样yt-dlp会自动处理YouTube等网站的复杂性，就像命令行一样
-        }
+        """获取基于最新官方源代码的增强选项"""
+        try:
+            from .youtube_config import youtube_config
+
+            # 使用基于最新官方源代码的配置
+            enhanced_opts = {
+                'extractor_args': youtube_config.get_extractor_args(),
+                'http_headers': youtube_config.get_http_headers(),
+            }
+
+            logger.debug("✅ 使用基于最新官方源代码的YouTube配置")
+            return enhanced_opts
+
+        except Exception as e:
+            logger.warning(f"⚠️ 加载YouTube配置失败，使用默认配置: {e}")
+            # 回退到基本配置
+            return {
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android_vr', 'web_embedded', 'tv', 'mweb'],
+                        'player_skip': ['webpage'],
+                    }
+                }
+            }
 
 # 全局实例
 _ytdlp_manager = YtdlpManager()

@@ -45,12 +45,29 @@ def get_video_info():
             logger.warning(f"Invalid URL attempted: {url} - {error_msg}")
             return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
 
-        # 最简配置 - 让yt-dlp使用默认行为
-        ydl_opts = {
-            'quiet': True,
-            'skip_download': True,  # 只获取信息，不下载
-            # 让yt-dlp使用所有默认设置，包括自动处理YouTube等网站
-        }
+        # 基于最新官方源代码的配置 - 使用新的YouTube配置管理器
+        try:
+            from ..core.youtube_config import youtube_config
+            ydl_opts = youtube_config.get_base_options(skip_download=True)
+            logger.debug("✅ 使用基于最新官方源代码的YouTube配置")
+        except Exception as e:
+            logger.warning(f"⚠️ 加载YouTube配置失败，使用备用配置: {e}")
+            # 备用配置
+            ydl_opts = {
+                'quiet': True,
+                'skip_download': True,
+                'no_warnings': True,
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android_vr', 'web_embedded', 'tv', 'mweb'],
+                        'player_skip': ['webpage'],
+                    }
+                },
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                }
+            }
 
         # 合并增强配置
         enhanced_opts = ytdlp_manager.get_enhanced_options()
