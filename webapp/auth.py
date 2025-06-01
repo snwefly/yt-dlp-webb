@@ -320,30 +320,30 @@ def login_required(f):
 
         # 1. 优先检查 Authorization header
         auth_token = request.headers.get('Authorization')
-        logger.debug(f"🔐 认证检查 - 路径: {request.path}, Authorization头: {auth_token[:50] if auth_token else 'None'}...")
+        logger.info(f"🔐 认证检查 - 路径: {request.path}, Authorization头: {auth_token[:50] if auth_token else 'None'}...")
 
         if auth_token and auth_token.startswith('Bearer '):
             token = auth_token.split(' ')[1]
-            logger.debug(f"🔑 提取token: {token[:20]}...")
+            logger.info(f"🔑 提取token: {token[:20]}...")
             if auth_manager.verify_session(token):
                 is_authenticated = True
-                logger.debug(f"✅ Bearer token认证成功")
+                logger.info(f"✅ Bearer token认证成功")
             else:
-                logger.debug(f"❌ Bearer token认证失败")
+                logger.info(f"❌ Bearer token认证失败")
 
         # 2. 检查 Flask session
         if not is_authenticated and 'auth_token' in session:
-            logger.debug(f"🔍 检查Flask session")
+            logger.info(f"🔍 检查Flask session")
             if auth_manager.verify_session(session['auth_token']):
                 is_authenticated = True
-                logger.debug(f"✅ Flask session认证成功")
+                logger.info(f"✅ Flask session认证成功")
             else:
-                logger.debug(f"❌ Flask session认证失败，清理session")
+                logger.info(f"❌ Flask session认证失败，清理session")
                 # 清理无效的session
                 session.clear()
 
         if is_authenticated:
-            logger.debug(f"✅ 认证成功，允许访问 {request.path}")
+            logger.info(f"✅ 认证成功，允许访问 {request.path}")
             return f(*args, **kwargs)
 
         # 未认证处理

@@ -361,33 +361,46 @@
             const token = getAuthToken();
             console.log('localStorage token:', token ? '存在' : '不存在');
 
-            // 如果服务器端已认证，直接使用
-            if (isAuthenticated && currentUser) {
-                console.log('✅ 服务器端已认证，用户:', currentUser);
-            }
-            // 如果有token但服务器端未认证，尝试验证token
-            else if (token && !isAuthenticated) {
-                console.log('🔄 检测到localStorage token但服务器端未认证，尝试验证...');
-                const tokenValid = await validateToken();
-                if (tokenValid) {
-                    // Token有效，更新认证状态
-                    isAuthenticated = true;
-                    // 尝试获取用户信息
-                    try {
-                        const response = await axios.get('/api/auth/verify', {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        if (response.data.valid) {
-                            currentUser = response.data.username;
-                            console.log('✅ 已更新用户信息:', currentUser);
+            // 如果有token，始终确保认证状态同步（无论服务器端状态如何）
+            if (token) {
+                console.log('🔄 检测到localStorage token，确保认证状态同步...');
+
+                // 使用全局的认证同步函数
+                if (window.ensureAuthSync) {
+                    const syncSuccess = await window.ensureAuthSync();
+                    if (syncSuccess) {
+                        console.log('✅ 认证状态同步成功');
+
+                        // 验证token并获取用户信息
+                        const tokenValid = await validateToken();
+                        if (tokenValid) {
+                            isAuthenticated = true;
+                            try {
+                                const response = await axios.get('/api/auth/verify', {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (response.data.valid) {
+                                    currentUser = response.data.username;
+                                    console.log('✅ 已更新用户信息:', currentUser);
+                                }
+                            } catch (error) {
+                                console.log('⚠️ 获取用户信息失败:', error);
+                            }
                         }
-                    } catch (error) {
-                        console.log('⚠️ 获取用户信息失败:', error);
+                    } else {
+                        console.log('❌ 认证状态同步失败，token已清理');
+                        isAuthenticated = false;
+                        currentUser = null;
                     }
                 }
-            } else if (token) {
-                // 如果有token且服务器端已认证，仍然验证一下token有效性
-                await validateToken();
+            } else {
+                console.log('ℹ️ 无localStorage token，保持当前认证状态');
+                // 如果没有token但服务器端显示已认证，可能是session残留，清理状态
+                if (isAuthenticated) {
+                    console.log('⚠️ 无token但服务器端显示已认证，清理认证状态');
+                    isAuthenticated = false;
+                    currentUser = null;
+                }
             }
 
             // 绑定事件
@@ -413,6 +426,16 @@
         async function checkCookiesStatus() {
             if (!isUserAuthenticated()) {
                 return;
+            }
+
+            // 确保认证状态同步
+            if (window.ensureAuthSync) {
+                console.log('🔄 检查cookies前确保认证状态同步...');
+                const syncSuccess = await window.ensureAuthSync();
+                if (!syncSuccess) {
+                    console.log('❌ 认证状态同步失败，跳过cookies检查');
+                    return;
+                }
             }
 
             try {
@@ -522,6 +545,17 @@
 
             const token = getAuthToken();
 
+            // 确保认证状态同步
+            if (window.ensureAuthSync) {
+                console.log('🔄 API调用前确保认证状态同步...');
+                const syncSuccess = await window.ensureAuthSync();
+                if (!syncSuccess) {
+                    console.log('❌ 认证状态同步失败，需要重新登录');
+                    showLoginRequired('查看视频信息');
+                    return;
+                }
+            }
+
             const url = document.getElementById('url').value.trim();
             if (!url) {
                 showMessage('请输入视频链接', 'error');
@@ -580,6 +614,17 @@
             }
 
             const token = getAuthToken();
+
+            // 确保认证状态同步
+            if (window.ensureAuthSync) {
+                console.log('🔄 下载前确保认证状态同步...');
+                const syncSuccess = await window.ensureAuthSync();
+                if (!syncSuccess) {
+                    console.log('❌ 认证状态同步失败，需要重新登录');
+                    showLoginRequired('下载视频');
+                    return;
+                }
+            }
 
             const url = document.getElementById('url').value.trim();
             if (!url) {

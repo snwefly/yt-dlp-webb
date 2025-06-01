@@ -185,12 +185,12 @@
                         </a>
                     </li>
                     <li class="nav-item" id="nav-files-item" style="display: none;">
-                        <a class="nav-link" href="/files" id="nav-files">
+                        <a class="nav-link" href="#" id="nav-files" onclick="navigateToFiles(); return false;">
                             <i class="fas fa-folder me-1"></i>文件管理
                         </a>
                     </li>
                     <li class="nav-item" id="nav-admin-item" style="display: none;">
-                        <a class="nav-link" href="/admin" id="nav-admin">
+                        <a class="nav-link" href="#" id="nav-admin" onclick="navigateToAdmin(); return false;">
                             <i class="fas fa-cog me-1"></i>管理
                         </a>
                     </li>
@@ -382,7 +382,7 @@
                         <i class="fas fa-user me-1"></i>${username}
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="/files">
+                        <li><a class="dropdown-item" href="#" onclick="navigateToFiles(); return false;">
                             <i class="fas fa-folder me-2"></i>文件管理
                         </a></li>
                         ${isAdmin ? '<li><a class="dropdown-item" href="#" onclick="navigateToAdmin(); return false;"><i class="fas fa-cog me-2"></i>管理</a></li>' : ''}
@@ -431,17 +431,17 @@
             window.location.href = '/login';
         }
 
-        // 导航到管理页面（先同步session）
-        async function navigateToAdmin() {
+        // 通用的认证页面导航函数
+        async function navigateWithAuth(targetUrl, pageName = '页面') {
             const token = getAuthToken();
             if (!token) {
-                console.log('❌ 无认证token，重定向到登录页');
+                console.log(`❌ 无认证token，重定向到登录页 - ${pageName}`);
                 window.location.href = '/login';
                 return;
             }
 
             try {
-                console.log('🔄 同步session到后端...');
+                console.log(`🔄 同步session到后端 - ${pageName}...`);
                 // 先同步session
                 const response = await fetch('/api/auth/sync-session', {
                     method: 'POST',
@@ -452,21 +452,31 @@
                 });
 
                 if (response.ok) {
-                    console.log('✅ Session同步成功，导航到管理页面');
-                    window.location.href = '/admin';
+                    console.log(`✅ Session同步成功，导航到${pageName}`);
+                    window.location.href = targetUrl;
                 } else if (response.status === 401) {
-                    console.log('❌ Token无效，重定向到登录页');
+                    console.log(`❌ Token无效，重定向到登录页 - ${pageName}`);
                     localStorage.removeItem('auth_token');
                     window.location.href = '/login';
                 } else {
-                    console.log('⚠️ Session同步失败，尝试直接导航');
-                    window.location.href = '/admin';
+                    console.log(`⚠️ Session同步失败，尝试直接导航到${pageName}`);
+                    window.location.href = targetUrl;
                 }
             } catch (error) {
-                console.error('Session同步请求失败:', error);
+                console.error(`Session同步请求失败 - ${pageName}:`, error);
                 // 网络错误时，直接尝试导航
-                window.location.href = '/admin';
+                window.location.href = targetUrl;
             }
+        }
+
+        // 导航到管理页面
+        async function navigateToAdmin() {
+            await navigateWithAuth('/admin', '管理页面');
+        }
+
+        // 导航到文件管理页面
+        async function navigateToFiles() {
+            await navigateWithAuth('/files', '文件管理页面');
         }
 
 
@@ -474,6 +484,41 @@
         // 全局函数：刷新导航栏状态
         window.refreshNavigation = function() {
             initializeNavigation();
+        };
+
+        // 全局函数：确保认证状态同步
+        window.ensureAuthSync = async function() {
+            const token = getAuthToken();
+            if (!token) {
+                console.log('❌ 无token，无需同步');
+                return false;
+            }
+
+            try {
+                console.log('🔄 确保认证状态同步...');
+                const response = await fetch('/api/auth/sync-session', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    console.log('✅ 认证状态同步成功');
+                    return true;
+                } else if (response.status === 401) {
+                    console.log('❌ Token无效，清理本地状态');
+                    localStorage.removeItem('auth_token');
+                    return false;
+                } else {
+                    console.warn('⚠️ 认证状态同步失败，但token可能仍有效');
+                    return true; // 假设token仍有效
+                }
+            } catch (error) {
+                console.error('认证状态同步请求失败:', error);
+                return true; // 网络错误时假设token仍有效
+            }
         };
 
         // 页面加载时初始化导航栏

@@ -266,12 +266,34 @@
                     const data = await response.json();
 
                     if (response.ok) {
-                        showSuccess('登录成功，正在跳转...');
+                        showSuccess('登录成功，正在同步认证状态...');
 
                         // 总是保存token到localStorage，因为前端依赖它进行认证
                         if (data.token) {
                             localStorage.setItem('auth_token', data.token);
                             console.log('✅ Token已保存到localStorage');
+
+                            // 立即同步session状态，确保后续页面导航正常
+                            try {
+                                console.log('🔄 同步session状态...');
+                                const syncResponse = await fetch('/api/auth/sync-session', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${data.token}`,
+                                        'Content-Type': 'application/json'
+                                    }
+                                });
+
+                                if (syncResponse.ok) {
+                                    console.log('✅ Session同步成功');
+                                    showSuccess('登录成功，正在跳转...');
+                                } else {
+                                    console.warn('⚠️ Session同步失败，但继续跳转');
+                                }
+                            } catch (syncError) {
+                                console.error('Session同步请求失败:', syncError);
+                                // 即使同步失败也继续跳转，因为localStorage中有token
+                            }
                         } else {
                             console.warn('⚠️ 登录响应中没有token');
                         }
@@ -280,7 +302,7 @@
                         setTimeout(() => {
                             const redirect = new URLSearchParams(window.location.search).get('redirect');
                             window.location.href = redirect || '/';
-                        }, 1000);
+                        }, 1500); // 稍微延长等待时间，确保同步完成
                     } else {
                         showError(data.error || '登录失败');
                     }
