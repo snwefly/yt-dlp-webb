@@ -46,6 +46,8 @@ class DownloadManager:
         with self.lock:
             self.downloads[download_id] = download_info
 
+        logger.info(f"📥 创建下载任务: {download_id} - {url}")
+
         # 立即启动下载任务
         self.executor.submit(self._execute_download, download_id, url, options or {})
 
@@ -128,60 +130,63 @@ class DownloadManager:
             )
 
     def _build_ytdlp_options(self, download_id, download_dir, options):
-        """构建yt-dlp下载选项 - 基于最新官方源代码优化"""
-        try:
-            from .youtube_config import youtube_config
+        """构建yt-dlp下载选项 - 基于最新源代码优化以避免bot检测"""
+        # 基础配置
+        ydl_opts = {
+            'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
+            # 网络配置
+            'socket_timeout': 30,
+            'retries': 3,
+            'fragment_retries': 3,
+            # 错误处理
+            'ignoreerrors': False,
+            'no_warnings': False,
+        }
 
-            # 使用基于最新官方源代码的基础配置
-            ydl_opts = youtube_config.get_download_options(download_dir, download_id)
+        # Cookies处理 - 优先使用YouTube cookies文件
+        cookies_set = False
+        cookies_file = os.path.abspath('webapp/config/youtube_cookies.txt')
 
-            # 记录客户端配置信息
-            youtube_config.log_client_info()
+        # 1. 优先使用YouTube cookies文件（已验证有效）
+        if os.path.exists(cookies_file):
+            ydl_opts['cookiefile'] = cookies_file
+            logger.info(f"🍪 使用YouTube cookies文件: {cookies_file}")
+            cookies_set = True
 
-        except Exception as e:
-            logger.warning(f"⚠️ 加载YouTube配置失败，使用备用配置: {e}")
-            # 备用配置
-            ydl_opts = {
-                'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
-                'socket_timeout': 30,
-                'retries': 3,
-                'fragment_retries': 3,
-                'ignoreerrors': False,
-                'no_warnings': False,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android_vr', 'web_embedded', 'tv', 'mweb'],
-                        'player_skip': ['webpage'],
-                    }
-                },
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept-Encoding': 'gzip, deflate',
-                }
-            }
+            # 验证cookies文件内容
+            try:
+                with open(cookies_file, 'r') as f:
+                    content = f.read()
+                    if 'youtube.com' in content and len(content) > 100:
+                        logger.info("✅ Cookies文件内容验证通过")
+                    else:
+                        logger.warning("⚠️ Cookies文件内容可能不完整")
+            except Exception as e:
+                logger.warning(f"⚠️ 读取cookies文件失败: {e}")
+        else:
+            logger.warning(f"⚠️ YouTube cookies文件不存在: {cookies_file}")
 
-        # Cookies处理 - 使用新的YouTube配置管理器
-        try:
-            from .youtube_config import youtube_config
-            cookies_set = youtube_config.setup_cookies(ydl_opts)
-        except Exception as e:
-            logger.warning(f"⚠️ 使用YouTube配置设置cookies失败: {e}")
-            # 备用cookies处理
-            cookies_set = False
-            browsers_to_try = [('chrome', 'Chrome'), ('firefox', 'Firefox')]
+        # 2. 备用：尝试浏览器cookies（容器环境通常不可用）
+        if not cookies_set:
+            try:
+                ydl_opts['cookiesfrombrowser'] = ('firefox',)
+                logger.info("🍪 尝试使用Firefox浏览器cookies")
+                cookies_set = True
+            except Exception as e:
+                logger.debug(f"Firefox cookies获取失败: {e}")
 
-            for browser_name, display_name in browsers_to_try:
-                try:
-                    ydl_opts['cookiesfrombrowser'] = (browser_name,)
-                    logger.info(f"🍪 使用{display_name}浏览器cookies")
-                    cookies_set = True
-                    break
-                except Exception as e:
-                    logger.debug(f"{display_name} cookies获取失败: {e}")
+        # 3. 最后备用：Chrome cookies
+        if not cookies_set:
+            try:
+                ydl_opts['cookiesfrombrowser'] = ('chrome',)
+                logger.info("🍪 尝试使用Chrome浏览器cookies")
+                cookies_set = True
+            except Exception as e:
+                logger.debug(f"Chrome cookies获取失败: {e}")
 
-            if not cookies_set:
-                logger.info("ℹ️ 无cookies可用，将优先使用android_vr客户端")
+        # 4. 如果都没有，记录警告
+        if not cookies_set:
+            logger.warning("❌ 无可用cookies，YouTube下载可能失败")
 
         # 进度回调
         def progress_hook(d):

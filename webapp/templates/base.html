@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}yt-dlp Web 下载器{% endblock %}</title>
+
+    <!-- 认证状态元数据 -->
+    <meta name="auth-status" content="{{ 'true' if is_authenticated else 'false' }}">
+    <meta name="current-user" content="{{ current_user or '' }}">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            margin: 20px auto;
+            max-width: 1400px;
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 20px 20px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-custom {
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+        }
+
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .card-custom {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* 管理页面特殊样式 */
+        .admin-nav {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .admin-nav a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .admin-nav a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status-good { background: #d4edda; color: #155724; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-info { background: #d1ecf1; color: #0c5460; }
+
+        /* 导航栏下拉菜单样式 */
+        .navbar .dropdown-menu {
+            border: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+            z-index: 1050;
+        }
+
+        .navbar .dropdown-item {
+            padding: 8px 16px;
+            transition: all 0.2s ease;
+            color: #495057;
+        }
+
+        .navbar .dropdown-item:hover {
+            background-color: #f8f9fa;
+            color: #495057;
+        }
+
+        .navbar .dropdown-divider {
+            margin: 8px 0;
+        }
+
+        /* 确保下拉箭头正确显示 */
+        .navbar .dropdown-toggle::after {
+            margin-left: 0.5em;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- 统一导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-cloud-download-alt me-2"></i>yt-dlp Web
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="nav-home">
+                            <i class="fas fa-home me-1"></i>首页
+                        </a>
+                    </li>
+                    <li class="nav-item" id="nav-files-item" style="display: none;">
+                        <a class="nav-link" href="/files" id="nav-files">
+                            <i class="fas fa-folder me-1"></i>文件管理
+                        </a>
+                    </li>
+                    <li class="nav-item" id="nav-admin-item" style="display: none;">
+                        <a class="nav-link" href="/admin" id="nav-admin">
+                            <i class="fas fa-cog me-1"></i>管理
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav" id="user-nav">
+                    <!-- 用户信息将通过JavaScript动态加载 -->
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+        <div class="main-container">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script>
+        // 全局工具函数
+        function showMessage(message, type = 'info') {
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-danger',
+                'warning': 'alert-warning',
+                'info': 'alert-info'
+            }[type] || 'alert-info';
+
+            const icon = {
+                'success': 'check-circle',
+                'error': 'exclamation-circle',
+                'warning': 'exclamation-triangle',
+                'info': 'info-circle'
+            }[type] || 'info-circle';
+
+            Swal.fire({
+                icon: type === 'error' ? 'error' : type === 'warning' ? 'warning' : type === 'success' ? 'success' : 'info',
+                title: message,
+                timer: 3000,
+                timerProgressBar: true,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        }
+
+        function showSuccess(message) {
+            showMessage(message, 'success');
+        }
+
+        function showError(message) {
+            showMessage(message, 'error');
+        }
+
+        function showWarning(message) {
+            showMessage(message, 'warning');
+        }
+
+        function showInfo(message) {
+            showMessage(message, 'info');
+        }
+
+        // 全局变量 - 认证状态
+        let isAuthenticated = false;
+        let currentUser = null;
+
+        // 从页面元数据获取认证状态
+        try {
+            const authMeta = document.querySelector('meta[name="auth-status"]');
+            const userMeta = document.querySelector('meta[name="current-user"]');
+
+            if (authMeta) {
+                isAuthenticated = authMeta.content === 'true';
+            }
+            if (userMeta && userMeta.content) {
+                currentUser = userMeta.content;
+            }
+        } catch (e) {
+            console.log('无法从元数据获取认证状态，使用默认值');
+        }
+
+        // 获取有效的认证token
+        function getAuthToken() {
+            const token = localStorage.getItem('auth_token');
+            return token;
+        }
+
+        // 检查认证状态
+        function isUserAuthenticated() {
+            const token = getAuthToken();
+            const authenticated = (token && token.length > 0) || isAuthenticated;
+            return authenticated;
+        }
+
+        // 验证token有效性
+        async function validateToken() {
+            const token = getAuthToken();
+            if (!token) {
+                return false;
+            }
+
+            try {
+                const response = await axios.get('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.data.valid) {
+                    return true;
+                } else {
+                    localStorage.removeItem('auth_token');
+                    return false;
+                }
+            } catch (error) {
+                localStorage.removeItem('auth_token');
+                return false;
+            }
+        }
+
+        // 初始化导航栏
+        async function initializeNavigation() {
+            try {
+                // 检查认证状态
+                if (!isUserAuthenticated()) {
+                    showGuestNavigation();
+                    return;
+                }
+
+                const token = getAuthToken();
+                if (!token) {
+                    showGuestNavigation();
+                    return;
+                }
+
+                // 验证token并获取用户信息
+                const response = await fetch('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.valid) {
+                        // 更新全局认证状态
+                        isAuthenticated = true;
+                        currentUser = data.username;
+                        showUserNavigation(data.username, data.is_admin);
+                        setActiveNavItem();
+                        return;
+                    }
+                }
+
+                // token无效，清除并显示访客导航
+                localStorage.removeItem('auth_token');
+                isAuthenticated = false;
+                currentUser = null;
+                showGuestNavigation();
+
+            } catch (error) {
+                console.error('导航栏初始化失败:', error);
+                showGuestNavigation();
+            }
+        }
+
+        // 显示用户导航
+        function showUserNavigation(username, isAdmin) {
+            // 显示文件管理
+            document.getElementById('nav-files-item').style.display = 'block';
+
+            // 显示管理菜单（仅管理员）
+            if (isAdmin) {
+                document.getElementById('nav-admin-item').style.display = 'block';
+            }
+
+            // 设置用户信息
+            const userNav = document.getElementById('user-nav');
+            userNav.innerHTML = `
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-user me-1"></i>${username}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="/files">
+                            <i class="fas fa-folder me-2"></i>文件管理
+                        </a></li>
+                        ${isAdmin ? '<li><a class="dropdown-item" href="#" onclick="navigateToAdmin(); return false;"><i class="fas fa-cog me-2"></i>管理</a></li>' : ''}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="logout()">
+                            <i class="fas fa-sign-out-alt me-2"></i>退出
+                        </a></li>
+                    </ul>
+                </li>
+            `;
+        }
+
+        // 显示访客导航
+        function showGuestNavigation() {
+            // 隐藏需要认证的菜单
+            document.getElementById('nav-files-item').style.display = 'none';
+            document.getElementById('nav-admin-item').style.display = 'none';
+
+            // 设置访客信息
+            const userNav = document.getElementById('user-nav');
+            userNav.innerHTML = `
+                <li class="nav-item">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt me-1"></i>登录
+                    </a>
+                </li>
+            `;
+        }
+
+        // 设置当前页面的导航项为活跃状态
+        function setActiveNavItem() {
+            const currentPath = window.location.pathname;
+            const navItems = document.querySelectorAll('.nav-link');
+
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === currentPath) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('auth_token');
+            window.location.href = '/login';
+        }
+
+        // 导航到管理页面（先同步session）
+        async function navigateToAdmin() {
+            const token = getAuthToken();
+            if (!token) {
+                console.log('❌ 无认证token，重定向到登录页');
+                window.location.href = '/login';
+                return;
+            }
+
+            try {
+                console.log('🔄 同步session到后端...');
+                // 先同步session
+                const response = await fetch('/api/auth/sync-session', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    console.log('✅ Session同步成功，导航到管理页面');
+                    window.location.href = '/admin';
+                } else if (response.status === 401) {
+                    console.log('❌ Token无效，重定向到登录页');
+                    localStorage.removeItem('auth_token');
+                    window.location.href = '/login';
+                } else {
+                    console.log('⚠️ Session同步失败，尝试直接导航');
+                    window.location.href = '/admin';
+                }
+            } catch (error) {
+                console.error('Session同步请求失败:', error);
+                // 网络错误时，直接尝试导航
+                window.location.href = '/admin';
+            }
+        }
+
+
+
+        // 全局函数：刷新导航栏状态
+        window.refreshNavigation = function() {
+            initializeNavigation();
+        };
+
+        // 页面加载时初始化导航栏
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 导航栏初始化开始');
+
+            // 简单直接的初始化
+            initializeNavigation();
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

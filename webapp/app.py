@@ -161,7 +161,7 @@ def _register_blueprints(app):
         app.register_blueprint(main_bp)
         app.register_blueprint(auth_bp)
         app.register_blueprint(api_bp, url_prefix='/api')
-        app.register_blueprint(admin_bp, url_prefix='/api/admin')
+        app.register_blueprint(admin_bp, url_prefix='/admin')
         app.register_blueprint(shortcuts_bp, url_prefix='/api/shortcuts')
 
         logger.info("✅ 蓝图注册成功")
@@ -169,5 +169,15 @@ def _register_blueprints(app):
     except Exception as e:
         logger.error(f"蓝图注册失败: {e}")
 
-# 创建应用实例
-app = create_app()
+# 为 gunicorn 提供应用工厂函数
+def get_app():
+    """获取应用实例（用于 gunicorn）"""
+    return create_app()
+
+# 为了兼容性，提供 app 变量（仅在直接运行时使用）
+if __name__ == '__main__':
+    app = create_app()
+    app.run(host='0.0.0.0', port=8080, debug=False)
+else:
+    # 为 gunicorn 提供应用实例
+    app = create_app()

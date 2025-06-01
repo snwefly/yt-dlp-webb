@@ -364,29 +364,50 @@ def admin_required(f):
     """管理员权限验证装饰器"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 先检查登录
+        logger.info(f"🔐 管理员权限检查 - 路径: {request.path}")
+
+        # 获取token - 优先使用Authorization header，然后是session
+        token = None
+        token_source = None
+
         auth_token = request.headers.get('Authorization')
         if auth_token and auth_token.startswith('Bearer '):
             token = auth_token.split(' ')[1]
+            token_source = 'header'
+            logger.info(f"🔑 使用Authorization header token: {token[:20]}...")
         elif 'auth_token' in session:
             token = session['auth_token']
+            token_source = 'session'
+            logger.info(f"🔑 使用Flask session token: {token[:20]}...")
         else:
+            logger.warning(f"❌ 未找到认证token - 路径: {request.path}")
+            logger.warning(f"   - Authorization header: {request.headers.get('Authorization', 'None')}")
+            logger.warning(f"   - Session keys: {list(session.keys())}")
             if request.path.startswith('/api/'):
                 return jsonify({'error': '需要登录', 'code': 'AUTH_REQUIRED'}), 401
             return redirect(url_for('auth.login'))
 
+        # 验证token
         if not auth_manager.verify_session(token):
+            logger.warning(f"❌ token验证失败 - 路径: {request.path}, 来源: {token_source}")
+            logger.warning(f"   - Token: {token[:20]}...")
+            logger.warning(f"   - 活跃会话数: {len(auth_manager.active_sessions)}")
             if request.path.startswith('/api/'):
                 return jsonify({'error': '会话已过期', 'code': 'SESSION_EXPIRED'}), 401
             return redirect(url_for('auth.login'))
 
         # 检查是否为管理员
         username = auth_manager.get_session_user(token)
+        logger.info(f"👤 当前用户: {username}, 管理员: {auth_manager.admin_username}")
+
         if username != auth_manager.admin_username:
+            logger.warning(f"❌ 权限不足 - 用户: {username}, 路径: {request.path}")
             if request.path.startswith('/api/'):
                 return jsonify({'error': '需要管理员权限', 'code': 'ADMIN_REQUIRED'}), 403
-            return jsonify({'error': '权限不足'}), 403
+            # 对于页面请求，重定向到首页并显示错误信息
+            return redirect(url_for('main.index') + '?error=permission_denied')
 
+        logger.info(f"✅ 管理员权限验证通过 - 用户: {username}, token来源: {token_source}")
         return f(*args, **kwargs)
 
     return decorated_function

@@ -45,29 +45,26 @@ def get_video_info():
             logger.warning(f"Invalid URL attempted: {url} - {error_msg}")
             return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
 
-        # 基于最新官方源代码的配置 - 使用新的YouTube配置管理器
-        try:
-            from ..core.youtube_config import youtube_config
-            ydl_opts = youtube_config.get_base_options(skip_download=True)
-            logger.debug("✅ 使用基于最新官方源代码的YouTube配置")
-        except Exception as e:
-            logger.warning(f"⚠️ 加载YouTube配置失败，使用备用配置: {e}")
-            # 备用配置
-            ydl_opts = {
-                'quiet': True,
-                'skip_download': True,
-                'no_warnings': True,
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android_vr', 'web_embedded', 'tv', 'mweb'],
-                        'player_skip': ['webpage'],
-                    }
-                },
-                'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                }
-            }
+        # YouTube cookies检查
+        if 'youtube.com' in url or 'youtu.be' in url:
+            from ..core.cookies_manager import get_cookies_manager
+            cookies_manager = get_cookies_manager()
+            status = cookies_manager.get_status()
+
+            if not status['exists'] or status['status'] in ['expired', 'incomplete']:
+                return jsonify({
+                    'error': 'YouTube视频需要有效的cookies认证',
+                    'solution': '请在管理页面导入有效的YouTube cookies',
+                    'cookies_status': status['status'],
+                    'message': status['message']
+                }), 400
+
+        # 最简配置 - 让yt-dlp使用默认行为
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,  # 只获取信息，不下载
+            # 让yt-dlp使用所有默认设置，包括自动处理YouTube等网站
+        }
 
         # 合并增强配置
         enhanced_opts = ytdlp_manager.get_enhanced_options()
@@ -283,8 +280,19 @@ def list_files():
                 file_info['file_size_formatted'] = "未知"
 
             # 格式化创建时间
-            if file_info.get('created_at'):
-                file_info['created_at_formatted'] = file_info['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            created_at = file_info.get('created_at')
+            if created_at:
+                try:
+                    from datetime import datetime
+                    if isinstance(created_at, str):
+                        # 处理ISO格式字符串
+                        created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    file_info['created_at_formatted'] = created_at.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception as e:
+                    logger.warning(f"时间格式化失败: {e}")
+                    file_info['created_at_formatted'] = '未知时间'
+            else:
+                file_info['created_at_formatted'] = '未知时间'
 
         return jsonify({
             'success': True,
@@ -295,3 +303,125 @@ def list_files():
     except Exception as e:
         logger.error(f"获取文件列表失败: {e}")
         return jsonify({'error': '获取文件列表失败'}), 500
+
+# Cookies管理相关API
+@api_bp.route('/cookies/status')
+@login_required
+def cookies_status():
+    """检查cookies状态"""
+    try:
+        from ..core.cookies_manager import get_cookies_manager
+        cookies_manager = get_cookies_manager()
+        status = cookies_manager.get_status()
+
+        return jsonify({
+            'success': True,
+            **status
+        })
+
+    except Exception as e:
+        logger.error(f'检查cookies状态失败: {e}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/cookies/test')
+@login_required
+def test_cookies():
+    """测试cookies有效性"""
+    try:
+        from ..core.cookies_manager import get_cookies_manager
+        cookies_manager = get_cookies_manager()
+        result = cookies_manager.test_cookies()
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f'测试cookies失败: {e}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/cookies/import', methods=['POST'])
+@login_required
+def import_cookies():
+    """导入cookies"""
+    try:
+        data = request.get_json()
+        cookies_content = data.get('cookies_content', '').strip()
+        cookies_format = data.get('format', 'auto')
+
+        if not cookies_content:
+            return jsonify({
+                'success': False,
+                'error': '请提供cookies内容'
+            }), 400
+
+        from ..core.cookies_manager import get_cookies_manager
+        cookies_manager = get_cookies_manager()
+        result = cookies_manager.import_cookies(cookies_content, cookies_format)
+
+        if result['success']:
+            logger.info(f"✅ 用户导入了新的cookies")
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f'导入cookies失败: {e}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/cookies/backup/list')
+@login_required
+def list_cookie_backups():
+    """列出cookies备份文件"""
+    try:
+        from ..core.cookies_manager import get_cookies_manager
+        cookies_manager = get_cookies_manager()
+        backups = cookies_manager.list_backups()
+
+        return jsonify({
+            'success': True,
+            'backups': backups
+        })
+
+    except Exception as e:
+        logger.error(f'列出备份失败: {e}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/cookies/backup/restore', methods=['POST'])
+@login_required
+def restore_cookie_backup():
+    """恢复cookies备份"""
+    try:
+        data = request.get_json()
+        backup_filename = data.get('backup_filename')
+
+        if not backup_filename:
+            return jsonify({
+                'success': False,
+                'error': '请指定备份文件名'
+            }), 400
+
+        from ..core.cookies_manager import get_cookies_manager
+        cookies_manager = get_cookies_manager()
+        result = cookies_manager.restore_backup(backup_filename)
+
+        if result['success']:
+            logger.info(f"✅ 用户恢复了cookies备份: {backup_filename}")
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f'恢复备份失败: {e}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

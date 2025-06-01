@@ -155,3 +155,27 @@ def start_update():
     except Exception as e:
         logger.error(f"开始更新失败: {e}")
         return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/')
+@admin_required
+def admin_index():
+    """管理员主页"""
+    from flask import render_template
+    from ..auth import get_current_user
+
+    current_user = get_current_user()
+    is_authenticated = current_user is not None
+
+    return render_template('admin.html', is_authenticated=is_authenticated, current_user=current_user)
+
+@admin_bp.route('/cookies-manager')
+@admin_required
+def cookies_manager_page():
+    """Cookies管理页面"""
+    from flask import render_template
+    from ..auth import get_current_user
+
+    current_user = get_current_user()
+    is_authenticated = current_user is not None
+
+    return render_template('admin/cookies_manager.html', is_authenticated=is_authenticated, current_user=current_user)

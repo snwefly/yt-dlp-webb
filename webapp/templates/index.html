@@ -1,53 +1,18 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>yt-dlp Web 下载器</title>
+{% extends "base.html" %}
 
-    <!-- 认证状态元数据 -->
-    <meta name="auth-status" content="{{ 'true' if is_authenticated else 'false' }}">
-    <meta name="current-user" content="{{ current_user or '' }}">
+{% block title %}yt-dlp Web 下载器{% endblock %}
 
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+{% block extra_css %}
     <!-- Animate.css -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
 
     <style>
-        :root {
-            --primary-color: #667eea;
-            --secondary-color: #764ba2;
-        }
-
-        body {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        .main-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            backdrop-filter: blur(10px);
-        }
-
         .header-section {
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             color: white;
             border-radius: 20px 20px 0 0;
             position: relative;
             overflow: hidden;
-        }
-
-        .user-controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 10;
         }
 
         .btn-custom {
@@ -137,23 +102,47 @@
             display: none !important;
         }
     </style>
-</head>
-<body>
-    <div class="container-fluid py-4">
-        <div class="main-container mx-auto" style="max-width: 1200px;">
-            <!-- Header -->
-            <div class="header-section p-5 text-center position-relative">
-                <div class="user-controls" id="userControls">
-                    <!-- 用户控件将通过 JavaScript 动态添加 -->
-                </div>
-                <h1 class="display-4 fw-bold mb-3">
-                    <i class="fas fa-download me-3"></i>yt-dlp Web 下载器
-                </h1>
-                <p class="lead mb-0">强大的视频下载工具，支持多平台视频下载</p>
-            </div>
+{% endblock %}
 
-            <!-- Main Content -->
-            <div class="p-4">
+{% block content %}
+    <!-- Header -->
+    <div class="header-section p-5 text-center position-relative">
+        <h1 class="display-4 fw-bold mb-3">
+            <i class="fas fa-download me-3"></i>yt-dlp Web 下载器
+        </h1>
+        <p class="lead mb-0">强大的视频下载工具，支持多平台视频下载</p>
+    </div>
+
+    <!-- Main Content -->
+    <div class="p-4">
+                <!-- YouTube Cookies状态提示 -->
+                <div id="cookies-status-alert" class="alert alert-warning d-none mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><i class="fas fa-exclamation-triangle me-2"></i>YouTube下载需要认证</strong>
+                            <p class="mb-0">检测到YouTube cookies未配置或已过期，可能无法下载YouTube视频</p>
+                        </div>
+                        <div>
+                            <button id="check-cookies-btn" class="btn btn-sm btn-outline-warning me-2">
+                                <i class="fas fa-sync-alt"></i> 检查状态
+                            </button>
+                            <a href="/admin/cookies-manager" class="btn btn-sm btn-warning" id="manage-cookies-btn" style="display: none;">
+                                <i class="fas fa-cog"></i> 管理Cookies
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cookies-success-alert" class="alert alert-success d-none mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><i class="fas fa-check-circle me-2"></i>YouTube下载已就绪</strong>
+                            <p class="mb-0">YouTube cookies已配置且有效，可以正常下载YouTube视频</p>
+                        </div>
+                        <small class="text-muted">状态良好</small>
+                    </div>
+                </div>
+
                 <div class="row g-4">
                     <!-- Left Panel - Download Form -->
                     <div class="col-lg-8">
@@ -357,92 +346,10 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+{% endblock %}
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Axios -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-
+{% block scripts %}
     <script>
-        // 全局变量 - 从服务器端获取
-        let isAuthenticated = false;
-        let currentUser = null;
-
-        // 从页面元数据获取认证状态
-        try {
-            const authMeta = document.querySelector('meta[name="auth-status"]');
-            const userMeta = document.querySelector('meta[name="current-user"]');
-
-            if (authMeta) {
-                isAuthenticated = authMeta.content === 'true';
-            }
-            if (userMeta && userMeta.content) {
-                currentUser = userMeta.content;
-            }
-        } catch (e) {
-            console.log('无法从元数据获取认证状态，使用默认值');
-        }
-
-        // 备用方法：检查 localStorage 中的 token
-        const token = localStorage.getItem('auth_token');
-        if (token && !isAuthenticated) {
-            // 如果有 token 但服务器端认为未认证，可能是 token 过期
-            console.log('检测到 localStorage token，但服务器端未认证');
-        }
-
-        // 获取有效的认证token
-        function getAuthToken() {
-            const token = localStorage.getItem('auth_token');
-            console.log('🔑 获取认证token:', token ? `存在(${token.substring(0, 10)}...)` : '不存在');
-            return token;
-        }
-
-        // 检查认证状态
-        function isUserAuthenticated() {
-            const token = getAuthToken();
-            const authenticated = (token && token.length > 0) || isAuthenticated;
-            console.log('🔐 用户认证状态:', {
-                hasToken: !!token,
-                serverAuth: isAuthenticated,
-                finalAuth: authenticated
-            });
-            return authenticated;
-        }
-
-        // 验证token有效性
-        async function validateToken() {
-            const token = getAuthToken();
-            if (!token) {
-                console.log('🔍 没有token，跳过验证');
-                return false;
-            }
-
-            try {
-                console.log('🔍 验证token有效性...');
-                const response = await axios.get('/api/auth/verify', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.data.valid) {
-                    console.log('✅ Token验证成功');
-                    return true;
-                } else {
-                    console.log('❌ Token验证失败，清除无效token');
-                    localStorage.removeItem('auth_token');
-                    return false;
-                }
-            } catch (error) {
-                console.log('❌ Token验证出错，清除token:', error.response?.status);
-                localStorage.removeItem('auth_token');
-                return false;
-            }
-        }
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', async function() {
@@ -452,9 +359,14 @@
 
             // 检查 localStorage 中的 token
             const token = getAuthToken();
+            console.log('localStorage token:', token ? '存在' : '不存在');
 
+            // 如果服务器端已认证，直接使用
+            if (isAuthenticated && currentUser) {
+                console.log('✅ 服务器端已认证，用户:', currentUser);
+            }
             // 如果有token但服务器端未认证，尝试验证token
-            if (token && !isAuthenticated) {
+            else if (token && !isAuthenticated) {
                 console.log('🔄 检测到localStorage token但服务器端未认证，尝试验证...');
                 const tokenValid = await validateToken();
                 if (tokenValid) {
@@ -478,64 +390,103 @@
                 await validateToken();
             }
 
-            // 初始化用户界面
-            initializeUserInterface();
-
             // 绑定事件
             bindEvents();
 
-            // 显示欢迎消息
+            // 显示欢迎消息和检查状态
             if (isUserAuthenticated()) {
+                console.log('✅ 用户已认证，显示欢迎消息');
                 showMessage('欢迎使用 yt-dlp Web 下载器！', 'success');
+                // 检查cookies状态
+                checkCookiesStatus();
+
+
             } else {
+                console.log('ℹ️ 用户未认证，显示访客消息');
                 showMessage('您正在以访客模式浏览，登录后可使用下载功能。', 'info');
             }
         });
 
-        // 初始化用户界面
-        function initializeUserInterface() {
-            const userControls = document.getElementById('userControls');
-            const token = localStorage.getItem('auth_token');
 
-            // 检查最新的认证状态
-            const authenticated = isUserAuthenticated();
-            const displayUser = currentUser || 'admin'; // 默认显示admin
 
-            if (authenticated) {
-                // 已登录用户界面
-                userControls.innerHTML = `
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="text-white-50">
-                            <i class="fas fa-user me-2"></i>${displayUser}
-                        </span>
-                        <button class="btn btn-outline-light btn-sm" onclick="window.location.href='/files'">
-                            <i class="fas fa-folder me-2"></i>文件管理
-                        </button>
-                        <button class="btn btn-outline-light btn-sm" onclick="window.location.href='/admin'">
-                            <i class="fas fa-cog me-2"></i>管理
-                        </button>
-                        <button class="btn btn-outline-light btn-sm" onclick="logout()">
-                            <i class="fas fa-sign-out-alt me-2"></i>退出
-                        </button>
-                    </div>
-                `;
-            } else {
-                // 访客用户界面
-                userControls.innerHTML = `
-                    <div class="d-flex align-items-center gap-3">
-                        <span class="text-white-50">
-                            <i class="fas fa-user-slash me-2"></i>访客模式
-                        </span>
-                        <button class="btn btn-outline-light btn-sm" onclick="window.location.href='/login'">
-                            <i class="fas fa-sign-in-alt me-2"></i>登录
-                        </button>
-                    </div>
-                `;
+        // 检查cookies状态
+        async function checkCookiesStatus() {
+            if (!isUserAuthenticated()) {
+                return;
             }
+
+            try {
+                const token = getAuthToken();
+                const response = await axios.get('/api/cookies/status', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.data.success) {
+                    updateCookiesStatusDisplay(response.data);
+                } else {
+                    showCookiesWarning('检查cookies状态失败');
+                }
+            } catch (error) {
+                console.log('检查cookies状态失败:', error);
+                // 如果是401错误，说明需要登录
+                if (error.response?.status !== 401) {
+                    showCookiesWarning('无法检查cookies状态');
+                }
+            }
+        }
+
+        // 更新cookies状态显示
+        function updateCookiesStatusDisplay(status) {
+            const warningAlert = document.getElementById('cookies-status-alert');
+            const successAlert = document.getElementById('cookies-success-alert');
+            const manageCookiesBtn = document.getElementById('manage-cookies-btn');
+
+            // 隐藏所有提示
+            warningAlert.classList.add('d-none');
+            successAlert.classList.add('d-none');
+
+            if (!status.exists || status.status === 'expired' || status.status === 'incomplete') {
+                // 显示警告
+                warningAlert.classList.remove('d-none');
+                if (isUserAuthenticated()) {
+                    manageCookiesBtn.style.display = 'inline-block';
+                }
+            } else if (status.status === 'good' || status.status === 'warning') {
+                // 显示成功
+                successAlert.classList.remove('d-none');
+                const statusText = successAlert.querySelector('small');
+                if (status.status === 'warning') {
+                    statusText.textContent = '建议近期更新';
+                    statusText.className = 'text-warning';
+                } else {
+                    statusText.textContent = '状态良好';
+                    statusText.className = 'text-muted';
+                }
+            }
+        }
+
+        // 显示cookies警告
+        function showCookiesWarning(message) {
+            const warningAlert = document.getElementById('cookies-status-alert');
+            const messageElement = warningAlert.querySelector('p');
+            messageElement.textContent = message;
+            warningAlert.classList.remove('d-none');
         }
 
         // 绑定事件
         function bindEvents() {
+            // cookies状态检查按钮
+            document.getElementById('check-cookies-btn').addEventListener('click', function() {
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 检查中';
+                this.disabled = true;
+
+                checkCookiesStatus().finally(() => {
+                    this.innerHTML = '<i class="fas fa-sync-alt"></i> 检查状态';
+                    this.disabled = false;
+                });
+            });
             // 粘贴按钮
             document.getElementById('pasteBtn').addEventListener('click', async function() {
                 try {
@@ -958,8 +909,8 @@
             }
         }
 
-        // 退出登录
-        function logout() {
+        // 退出登录（首页版本，使用确认对话框）
+        function logoutWithConfirm() {
             Swal.fire({
                 title: '确认退出',
                 text: '您确定要退出登录吗？',
@@ -976,5 +927,4 @@
             });
         }
     </script>
-</body>
-</html>
+{% endblock %}

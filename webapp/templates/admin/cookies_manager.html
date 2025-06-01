@@ -1,0 +1,573 @@
+{% extends "base.html" %}
+
+{% block title %}Cookies管理 - 管理员{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>🍪 YouTube Cookies管理</h2>
+                <div>
+                    <button id="refreshStatus" class="btn btn-outline-primary">
+                        <i class="fas fa-sync-alt"></i> 刷新状态
+                    </button>
+                    <a href="/admin" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> 返回管理
+                    </a>
+                </div>
+            </div>
+
+            <!-- 状态卡片 -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Cookies状态</h5>
+                            <div id="cookiesStatusBadge" class="mb-2">
+                                <span class="badge bg-secondary">检查中...</span>
+                            </div>
+                            <p id="cookiesStatusText" class="card-text text-muted">正在检查状态...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-info">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">有效性测试</h5>
+                            <div id="validityBadge" class="mb-2">
+                                <span class="badge bg-secondary">未测试</span>
+                            </div>
+                            <button id="testCookies" class="btn btn-sm btn-info">
+                                <i class="fas fa-vial"></i> 测试
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-success">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">备份数量</h5>
+                            <div id="backupCount" class="mb-2">
+                                <span class="badge bg-secondary">0</span>
+                            </div>
+                            <button id="refreshBackups" class="btn btn-sm btn-success">
+                                <i class="fas fa-list"></i> 查看
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主要功能标签页 -->
+            <ul class="nav nav-tabs" id="cookiesTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="import-tab" data-bs-toggle="tab" data-bs-target="#import" type="button">
+                        <i class="fas fa-upload"></i> 导入Cookies
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button">
+                        <i class="fas fa-archive"></i> 备份管理
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="help-tab" data-bs-toggle="tab" data-bs-target="#help" type="button">
+                        <i class="fas fa-question-circle"></i> 获取指南
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="cookiesTabContent">
+                <!-- 导入Cookies标签页 -->
+                <div class="tab-pane fade show active" id="import" role="tabpanel">
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-upload"></i> 导入新的Cookies</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-info-circle"></i> 支持的格式:</h6>
+                                <ul class="mb-0">
+                                    <li><strong>JSON格式:</strong> 浏览器扩展导出的JSON文件内容</li>
+                                    <li><strong>Netscape格式:</strong> 标准的cookies.txt格式</li>
+                                    <li><strong>自动检测:</strong> 系统会自动识别格式并转换</li>
+                                </ul>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="cookiesFormat" class="form-label">Cookies格式</label>
+                                    <select class="form-select" id="cookiesFormat">
+                                        <option value="auto">自动检测</option>
+                                        <option value="json">JSON格式</option>
+                                        <option value="netscape">Netscape格式</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">快速操作</label>
+                                    <div>
+                                        <button id="clearContent" class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-trash"></i> 清空
+                                        </button>
+                                        <button id="pasteExample" class="btn btn-outline-info btn-sm ms-2">
+                                            <i class="fas fa-paste"></i> 示例
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="cookiesContent" class="form-label">Cookies内容</label>
+                                <textarea class="form-control font-monospace" id="cookiesContent" rows="12" 
+                                          placeholder="粘贴您的cookies内容...
+
+支持格式：
+1. JSON格式 (浏览器扩展导出)
+2. Netscape格式 (cookies.txt)
+
+示例 JSON 格式：
+[{&quot;domain&quot;: &quot;.youtube.com&quot;, &quot;name&quot;: &quot;SID&quot;, &quot;value&quot;: &quot;...&quot;}]
+
+示例 Netscape 格式：
+# Netscape HTTP Cookie File
+.youtube.com	TRUE	/	FALSE	1234567890	SID	value"></textarea>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <button id="validateCookies" class="btn btn-outline-primary">
+                                        <i class="fas fa-check"></i> 验证格式
+                                    </button>
+                                    <button id="importCookies" class="btn btn-success ms-2">
+                                        <i class="fas fa-upload"></i> 导入Cookies
+                                    </button>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <small class="text-muted">导入前会自动备份现有cookies</small>
+                                </div>
+                            </div>
+
+                            <div id="importResult" class="mt-3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 备份管理标签页 -->
+                <div class="tab-pane fade" id="backup" role="tabpanel">
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-archive"></i> Cookies备份管理</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <button id="refreshBackupsList" class="btn btn-primary">
+                                        <i class="fas fa-sync-alt"></i> 刷新列表
+                                    </button>
+                                </div>
+                                <small class="text-muted">备份文件保存在: /app/config/</small>
+                            </div>
+
+                            <div id="backupsList">
+                                <div class="text-center text-muted">
+                                    <i class="fas fa-spinner fa-spin"></i> 加载备份列表...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 获取指南标签页 -->
+                <div class="tab-pane fade" id="help" role="tabpanel">
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-question-circle"></i> Cookies获取指南</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-chrome"></i> Chrome浏览器</h6>
+                                    <ol>
+                                        <li>安装扩展: "Get cookies.txt LOCALLY"</li>
+                                        <li>访问并登录 <a href="https://youtube.com" target="_blank">YouTube</a></li>
+                                        <li>点击扩展图标</li>
+                                        <li>选择 "youtube.com"</li>
+                                        <li>复制JSON内容到导入框</li>
+                                    </ol>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-firefox-browser"></i> Firefox浏览器</h6>
+                                    <ol>
+                                        <li>安装扩展: "cookies.txt"</li>
+                                        <li>访问并登录 <a href="https://youtube.com" target="_blank">YouTube</a></li>
+                                        <li>右键点击页面 → "Export cookies"</li>
+                                        <li>保存为 cookies.txt</li>
+                                        <li>复制内容到导入框</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning mt-3">
+                                <h6><i class="fas fa-exclamation-triangle"></i> 重要提醒</h6>
+                                <ul class="mb-0">
+                                    <li>导入前会自动备份现有cookies</li>
+                                    <li>支持格式自动检测和转换</li>
+                                    <li>导入后会自动测试有效性</li>
+                                    <li>建议每3个月更新一次</li>
+                                    <li>保持YouTube账号活跃状态</li>
+                                </ul>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-shield-alt"></i> 安全说明</h6>
+                                <ul class="mb-0">
+                                    <li>Cookies仅用于YouTube视频下载</li>
+                                    <li>不会存储您的密码信息</li>
+                                    <li>您可以随时更新或删除cookies</li>
+                                    <li>建议使用专门的YouTube账号</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 页面加载时检查状态
+    checkCookiesStatus();
+    loadBackupsList();
+
+    // 刷新状态按钮
+    document.getElementById('refreshStatus').addEventListener('click', function() {
+        checkCookiesStatus();
+        loadBackupsList();
+    });
+
+    // 测试cookies按钮
+    document.getElementById('testCookies').addEventListener('click', testCookiesValidity);
+
+    // 导入相关按钮
+    document.getElementById('validateCookies').addEventListener('click', validateCookiesFormat);
+    document.getElementById('importCookies').addEventListener('click', importCookies);
+    document.getElementById('clearContent').addEventListener('click', () => {
+        document.getElementById('cookiesContent').value = '';
+    });
+    document.getElementById('pasteExample').addEventListener('click', pasteExample);
+
+    // 备份相关按钮
+    document.getElementById('refreshBackups').addEventListener('click', loadBackupsList);
+    document.getElementById('refreshBackupsList').addEventListener('click', loadBackupsList);
+
+    // 检查cookies状态
+    function checkCookiesStatus() {
+        fetch('/api/cookies/status', {
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateStatusDisplay(data);
+            } else {
+                showError('检查状态失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('检查状态失败: ' + error.message);
+        });
+    }
+
+    // 更新状态显示
+    function updateStatusDisplay(status) {
+        const statusBadge = document.getElementById('cookiesStatusBadge');
+        const statusText = document.getElementById('cookiesStatusText');
+
+        let badgeClass = 'bg-secondary';
+        let statusMessage = '未知状态';
+
+        if (status.exists) {
+            switch (status.status) {
+                case 'good':
+                    badgeClass = 'bg-success';
+                    statusMessage = '状态良好';
+                    break;
+                case 'warning':
+                    badgeClass = 'bg-warning';
+                    statusMessage = '需要关注';
+                    break;
+                case 'expired':
+                    badgeClass = 'bg-danger';
+                    statusMessage = '可能过期';
+                    break;
+                case 'incomplete':
+                    badgeClass = 'bg-warning';
+                    statusMessage = '内容不完整';
+                    break;
+            }
+        } else {
+            badgeClass = 'bg-danger';
+            statusMessage = '不存在';
+        }
+
+        statusBadge.innerHTML = `<span class="badge ${badgeClass}">${statusMessage}</span>`;
+        statusText.textContent = status.message || '无详细信息';
+    }
+
+    // 测试cookies有效性
+    function testCookiesValidity() {
+        const btn = document.getElementById('testCookies');
+        const badge = document.getElementById('validityBadge');
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中';
+        badge.innerHTML = '<span class="badge bg-secondary">测试中...</span>';
+
+        fetch('/api/cookies/test', {
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.valid) {
+                    badge.innerHTML = '<span class="badge bg-success">有效</span>';
+                    showSuccess('Cookies测试通过，可以正常下载YouTube视频');
+                } else {
+                    badge.innerHTML = '<span class="badge bg-danger">无效</span>';
+                    showError('Cookies测试失败: ' + (data.message || data.error));
+                }
+            } else {
+                badge.innerHTML = '<span class="badge bg-danger">错误</span>';
+                showError('测试失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            badge.innerHTML = '<span class="badge bg-danger">错误</span>';
+            showError('测试失败: ' + error.message);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-vial"></i> 测试';
+        });
+    }
+
+    // 验证cookies格式
+    function validateCookiesFormat() {
+        const content = document.getElementById('cookiesContent').value.trim();
+        if (!content) {
+            showError('请先输入cookies内容');
+            return;
+        }
+
+        try {
+            // 尝试解析JSON
+            JSON.parse(content);
+            showSuccess('检测到有效的JSON格式');
+        } catch (e) {
+            // 检查Netscape格式
+            if (content.includes('# Netscape HTTP Cookie File') || 
+                (content.includes('\t') && content.includes('youtube.com'))) {
+                showSuccess('检测到Netscape格式');
+            } else {
+                showWarning('格式可能不正确，请检查内容');
+            }
+        }
+    }
+
+    // 导入cookies
+    function importCookies() {
+        const content = document.getElementById('cookiesContent').value.trim();
+        const format = document.getElementById('cookiesFormat').value;
+
+        if (!content) {
+            showError('请先输入cookies内容');
+            return;
+        }
+
+        const btn = document.getElementById('importCookies');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 导入中';
+
+        fetch('/api/cookies/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: JSON.stringify({
+                cookies_content: content,
+                format: format
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess('Cookies导入成功！找到 ' + data.found_cookies.length + ' 个重要cookies');
+                document.getElementById('cookiesContent').value = '';
+                checkCookiesStatus(); // 刷新状态
+                
+                // 显示测试结果
+                if (data.test_result) {
+                    if (data.test_result.valid) {
+                        showSuccess('导入的cookies测试通过，可以正常使用');
+                    } else {
+                        showWarning('导入成功但测试失败，可能需要重新获取cookies');
+                    }
+                }
+            } else {
+                showError('导入失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('导入失败: ' + error.message);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-upload"></i> 导入Cookies';
+        });
+    }
+
+    // 粘贴示例
+    function pasteExample() {
+        const example = `[
+    {
+        "domain": ".youtube.com",
+        "name": "SID",
+        "value": "your_sid_value_here",
+        "path": "/",
+        "secure": false,
+        "expirationDate": 1767225600
+    },
+    {
+        "domain": ".youtube.com", 
+        "name": "HSID",
+        "value": "your_hsid_value_here",
+        "path": "/",
+        "secure": false,
+        "expirationDate": 1767225600
+    }
+]`;
+        document.getElementById('cookiesContent').value = example;
+        showInfo('已粘贴示例格式，请替换为您的实际cookies值');
+    }
+
+    // 加载备份列表
+    function loadBackupsList() {
+        fetch('/api/cookies/backup/list', {
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayBackupsList(data.backups);
+                document.getElementById('backupCount').innerHTML = 
+                    `<span class="badge bg-success">${data.backups.length}</span>`;
+            } else {
+                showError('加载备份列表失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('加载备份列表失败: ' + error.message);
+        });
+    }
+
+    // 显示备份列表
+    function displayBackupsList(backups) {
+        const container = document.getElementById('backupsList');
+        
+        if (backups.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted">暂无备份文件</div>';
+            return;
+        }
+
+        let html = '<div class="table-responsive"><table class="table table-hover">';
+        html += '<thead><tr><th>文件名</th><th>创建时间</th><th>大小</th><th>操作</th></tr></thead><tbody>';
+
+        backups.forEach(backup => {
+            const sizeKB = (backup.file_size / 1024).toFixed(1);
+            html += `
+                <tr>
+                    <td><code>${backup.filename}</code></td>
+                    <td>${backup.created_time_str}</td>
+                    <td>${sizeKB} KB</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-success" onclick="restoreBackup('${backup.filename}')">
+                            <i class="fas fa-undo"></i> 恢复
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+
+    // 恢复备份
+    window.restoreBackup = function(filename) {
+        if (!confirm(`确定要恢复备份 "${filename}" 吗？这将替换当前的cookies。`)) {
+            return;
+        }
+
+        fetch('/api/cookies/backup/restore', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: JSON.stringify({
+                backup_filename: filename
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess('备份恢复成功: ' + data.message);
+                checkCookiesStatus(); // 刷新状态
+            } else {
+                showError('恢复失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('恢复失败: ' + error.message);
+        });
+    };
+
+    // 消息显示函数
+    function showSuccess(message) {
+        showMessage(message, 'success');
+    }
+
+    function showError(message) {
+        showMessage(message, 'danger');
+    }
+
+    function showWarning(message) {
+        showMessage(message, 'warning');
+    }
+
+    function showInfo(message) {
+        showMessage(message, 'info');
+    }
+
+    function showMessage(message, type) {
+        const result = document.getElementById('importResult');
+        result.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+    }
+});
+</script>
+{% endblock %}

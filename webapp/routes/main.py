@@ -4,7 +4,7 @@
 """
 
 from flask import Blueprint, render_template, jsonify, request
-from ..auth import login_required, admin_required
+from ..auth import login_required
 import logging
 import os
 
@@ -42,19 +42,25 @@ def index():
 @login_required
 def shortcuts_help():
     """iOS快捷指令使用指南"""
-    return render_template('shortcuts_help.html')
+    from ..auth import get_current_user
+
+    current_user = get_current_user()
+    is_authenticated = current_user is not None
+
+    return render_template('shortcuts_help.html', is_authenticated=is_authenticated, current_user=current_user)
 
 @main_bp.route('/files')
 @login_required
 def files():
     """文件管理页面"""
-    return render_template('files.html')
+    from ..auth import get_current_user
 
-@main_bp.route('/admin')
-@admin_required
-def admin():
-    """管理员控制台"""
-    return render_template('admin.html')
+    current_user = get_current_user()
+    is_authenticated = current_user is not None
+
+    return render_template('files.html', is_authenticated=is_authenticated, current_user=current_user)
+
+
 
 @main_bp.route('/debug')
 def debug():
@@ -155,3 +161,43 @@ def health_check():
             'timestamp': int(__import__('time').time()),
             'error': str(e)
         }), 500
+
+@main_bp.route('/auth-test')
+def auth_test():
+    """认证状态测试页面"""
+    from ..auth import get_current_user
+
+    current_user = get_current_user()
+    is_authenticated = current_user is not None
+
+    return render_template('auth_test.html', is_authenticated=is_authenticated, current_user=current_user)
+
+@main_bp.route('/admin-check')
+def admin_check():
+    """检查管理员权限状态"""
+    from flask import session
+    from ..auth import auth_manager
+
+    result = {
+        'timestamp': __import__('time').time(),
+        'session_has_token': 'auth_token' in session,
+        'admin_username': auth_manager.admin_username,
+        'current_user': None,
+        'is_admin': False,
+        'token_valid': False
+    }
+
+    if 'auth_token' in session:
+        token = session['auth_token']
+        result['token_valid'] = auth_manager.verify_session(token)
+        if result['token_valid']:
+            current_user = auth_manager.get_session_user(token)
+            result['current_user'] = current_user
+            result['is_admin'] = (current_user == auth_manager.admin_username)
+
+    return jsonify(result)
+
+
+
+
+

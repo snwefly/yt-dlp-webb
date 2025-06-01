@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理员控制台 - yt-dlp</title>
+{% extends "base.html" %}
+
+{% block title %}管理员控制台 - yt-dlp{% endblock %}
+
+{% block extra_css %}
     <style>
         * {
             margin: 0;
@@ -350,19 +349,15 @@
             }
         }
     </style>
-</head>
-<body>
-    <div class="header">
-        <div class="header-content">
-            <h1>🛠️ 管理员控制台</h1>
-            <div class="user-info">
-                <span>欢迎，<span id="username">管理员</span></span>
-                <button class="logout-btn" onclick="logout()">登出</button>
-            </div>
-        </div>
+{% endblock %}
+
+{% block content %}
+    <div class="header-section p-4 text-center">
+        <h1 class="display-5 fw-bold mb-2">🛠️ 管理员控制台</h1>
+        <p class="lead mb-0">系统管理和配置</p>
     </div>
 
-    <div class="container">
+    <div class="p-4">
         <div id="message-area"></div>
 
         <!-- 仪表板概览 -->
@@ -414,6 +409,30 @@
                         <span id="update-check-loading" class="loading hidden"></span>
                     </button>
                     <button class="btn btn-success" onclick="startUpdate()" id="update-btn" style="display: none;">开始更新</button>
+                </div>
+            </div>
+
+            <!-- Cookies管理卡片 -->
+            <div class="card">
+                <h3>🍪 Cookies管理</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div id="cookies-status" class="stat-value">-</div>
+                        <div class="stat-label">状态</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="cookies-validity" class="stat-value">-</div>
+                        <div class="stat-label">有效性</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-warning" onclick="window.location.href='/admin/cookies-manager'">
+                        🍪 管理Cookies
+                    </button>
+                    <button class="btn btn-secondary" onclick="checkCookiesStatus()">
+                        <span id="cookies-check-text">检查状态</span>
+                        <span id="cookies-check-loading" class="loading hidden"></span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -614,7 +633,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
+{% block scripts %}
     <script>
         // 全局变量
         let authToken = localStorage.getItem('auth_token') || '';
@@ -622,6 +643,8 @@
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
             checkAuth();
+            // 延迟检查cookies状态，等待认证完成
+            setTimeout(checkCookiesStatus, 1000);
         });
 
         // 检查认证状态
@@ -1131,6 +1154,94 @@
                 showMessage('清除会话时出现错误', 'error');
             }
         }
+
+        // 检查cookies状态
+        async function checkCookiesStatus() {
+            const statusElement = document.getElementById('cookies-status');
+            const validityElement = document.getElementById('cookies-validity');
+            const checkText = document.getElementById('cookies-check-text');
+            const checkLoading = document.getElementById('cookies-check-loading');
+
+            // 显示加载状态
+            checkText.classList.add('hidden');
+            checkLoading.classList.remove('hidden');
+            statusElement.textContent = '检查中';
+            validityElement.textContent = '检查中';
+
+            try {
+                const response = await fetch('/api/cookies/status', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // 更新状态显示
+                    if (data.exists) {
+                        switch (data.status) {
+                            case 'good':
+                                statusElement.textContent = '良好';
+                                statusElement.style.color = '#27ae60';
+                                break;
+                            case 'warning':
+                                statusElement.textContent = '注意';
+                                statusElement.style.color = '#f39c12';
+                                break;
+                            case 'expired':
+                                statusElement.textContent = '过期';
+                                statusElement.style.color = '#e74c3c';
+                                break;
+                            case 'incomplete':
+                                statusElement.textContent = '不完整';
+                                statusElement.style.color = '#e74c3c';
+                                break;
+                            default:
+                                statusElement.textContent = '未知';
+                                statusElement.style.color = '#95a5a6';
+                        }
+                    } else {
+                        statusElement.textContent = '不存在';
+                        statusElement.style.color = '#e74c3c';
+                    }
+
+                    // 测试有效性
+                    const testResponse = await fetch('/api/cookies/test', {
+                        headers: {
+                            'Authorization': `Bearer ${authToken}`
+                        }
+                    });
+
+                    if (testResponse.ok) {
+                        const testData = await testResponse.json();
+                        if (testData.valid) {
+                            validityElement.textContent = '有效';
+                            validityElement.style.color = '#27ae60';
+                        } else {
+                            validityElement.textContent = '无效';
+                            validityElement.style.color = '#e74c3c';
+                        }
+                    } else {
+                        validityElement.textContent = '测试失败';
+                        validityElement.style.color = '#e74c3c';
+                    }
+
+                    showMessage('Cookies状态检查完成');
+                } else {
+                    statusElement.textContent = '检查失败';
+                    validityElement.textContent = '检查失败';
+                    showMessage('检查cookies状态失败', 'error');
+                }
+            } catch (error) {
+                statusElement.textContent = '错误';
+                validityElement.textContent = '错误';
+                showMessage('检查cookies状态时出现错误', 'error');
+            } finally {
+                // 恢复按钮状态
+                checkText.classList.remove('hidden');
+                checkLoading.classList.add('hidden');
+            }
+        }
     </script>
-</body>
-</html>
+{% endblock %}

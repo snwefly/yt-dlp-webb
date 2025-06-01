@@ -106,31 +106,6 @@ def shortcuts_download_direct():
             else:
                 ydl_opts['format'] = quality
 
-            # 基于最新官方源代码的增强配置
-            try:
-                from ..core.youtube_config import youtube_config
-                enhanced_config = {
-                    'extractor_args': youtube_config.get_extractor_args(),
-                    'http_headers': youtube_config.get_http_headers(),
-                }
-                ydl_opts.update(enhanced_config)
-                logger.debug("✅ iOS Shortcuts使用基于最新官方源代码的YouTube配置")
-            except Exception as e:
-                logger.warning(f"⚠️ 加载YouTube配置失败，使用备用配置: {e}")
-                # 备用配置
-                ydl_opts.update({
-                    'extractor_args': {
-                        'youtube': {
-                            'player_client': ['android_vr', 'web_embedded', 'tv', 'mweb'],
-                            'player_skip': ['webpage'],
-                        }
-                    },
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                    }
-                })
-
             # 合并增强配置
             enhanced_opts = ytdlp_manager.get_enhanced_options()
             ydl_opts.update(enhanced_opts)
@@ -203,6 +178,7 @@ def shortcuts_get_file(download_id):
         return jsonify({'error': '文件下载失败'}), 500
 
 @shortcuts_bp.route('/download-file/<shortcut_type>')
+@login_required
 def download_shortcut_file(shortcut_type):
     """提供iOS快捷指令文件下载"""
     try:

@@ -4,7 +4,7 @@
 """
 
 from flask import Blueprint, render_template, request, jsonify, session
-from ..auth import auth_manager, login_required
+from ..auth import auth_manager, login_required, admin_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -108,6 +108,39 @@ def api_verify():
         logger.error(f"会话验证过程中发生错误: {e}")
         return jsonify({'error': str(e)}), 500
 
+@auth_bp.route('/api/auth/sync-session', methods=['POST'])
+def api_sync_session():
+    """同步localStorage token到Flask session"""
+    try:
+        # 获取Authorization header中的token
+        auth_token = request.headers.get('Authorization')
+        if not auth_token or not auth_token.startswith('Bearer '):
+            return jsonify({'error': '无效的Authorization header'}), 400
+
+        token = auth_token.split(' ')[1]
+
+        # 验证token有效性
+        if not auth_manager.verify_session(token):
+            return jsonify({'error': 'Token无效'}), 401
+
+        # 将token同步到Flask session
+        session.permanent = True
+        session['auth_token'] = token
+
+        username = auth_manager.get_session_user(token)
+        logger.info(f"✅ Token已同步到Flask session - 用户: {username}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Session同步成功',
+            'username': username,
+            'is_admin': username == auth_manager.admin_username
+        })
+
+    except Exception as e:
+        logger.error(f"Session同步失败: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @auth_bp.route('/api/auth/session-info', methods=['GET'])
 def api_session_info():
     """获取会话详细信息"""
@@ -198,26 +231,12 @@ def api_change_password():
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/api/auth/clear-all-sessions', methods=['POST'])
+@admin_required
 def api_clear_all_sessions():
     """清除所有会话"""
     try:
-        # 检查认证
-        auth_token = request.headers.get('Authorization')
-        if auth_token and auth_token.startswith('Bearer '):
-            token = auth_token.split(' ')[1]
-            if not auth_manager.verify_session(token):
-                return jsonify({'error': '会话无效'}), 401
-            username = auth_manager.get_session_user(token)
-        elif 'auth_token' in session:
-            if not auth_manager.verify_session(session['auth_token']):
-                return jsonify({'error': '会话无效'}), 401
-            username = auth_manager.get_session_user(session['auth_token'])
-        else:
-            return jsonify({'error': '未登录'}), 401
-
-        # 只有管理员可以清除所有会话
-        if username != auth_manager.admin_username:
-            return jsonify({'error': '权限不足'}), 403
+        from ..auth import get_current_user
+        username = get_current_user()
 
         # 清除所有会话
         cleared_count = auth_manager.clear_all_sessions()
