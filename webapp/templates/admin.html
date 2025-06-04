@@ -386,6 +386,10 @@
                         <span id="cleanup-text">立即清理</span>
                         <span id="cleanup-loading" class="loading hidden"></span>
                     </button>
+                    <button class="btn btn-danger" onclick="forceCleanup()">
+                        <span id="force-cleanup-text">强制清理</span>
+                        <span id="force-cleanup-loading" class="loading hidden"></span>
+                    </button>
                     <button class="btn btn-secondary" onclick="refreshStorage()">刷新</button>
                 </div>
             </div>
@@ -426,8 +430,11 @@
                     </div>
                 </div>
                 <div style="margin-top: 15px;">
-                    <button class="btn btn-warning" onclick="window.location.href='/admin/cookies-manager'">
+                    <button class="btn btn-warning" onclick="navigateToCookiesManager()">
                         🍪 管理Cookies
+                    </button>
+                    <button class="btn btn-info" onclick="navigateToTelegramSettings()">
+                        📱 Telegram设置
                     </button>
                     <button class="btn btn-secondary" onclick="checkCookiesStatus()">
                         <span id="cookies-check-text">检查状态</span>
@@ -541,6 +548,35 @@
             <!-- 安全设置标签页 -->
             <div id="security-tab" class="tab-content">
                 <div class="form-group">
+                    <h4 style="color: #2c3e50; margin-bottom: 20px;">👤 用户名管理</h4>
+                    <form id="change-username-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="current-username">当前用户名：</label>
+                                <input type="text" id="current-username" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-username">新用户名：</label>
+                                <input type="text" id="new-username" name="new_username" required minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+">
+                                <small style="color: #7f8c8d;">3-20位字符，仅支持字母、数字和下划线</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="username-password">确认密码：</label>
+                            <input type="password" id="username-password" name="password" required>
+                            <small style="color: #7f8c8d;">输入当前密码以确认修改</small>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button type="submit" class="btn btn-warning">
+                                <span id="change-username-text">修改用户名</span>
+                                <span id="change-username-loading" class="loading hidden"></span>
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearUsernameForm()">清空</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="form-group" style="margin-top: 40px;">
                     <h4 style="color: #2c3e50; margin-bottom: 20px;">🔐 密码管理</h4>
                     <form id="change-password-form">
                         <div class="form-group">
@@ -637,58 +673,59 @@
 
 {% block scripts %}
     <script>
-        // 全局变量
-        let authToken = localStorage.getItem('auth_token') || '';
-
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            checkAuth();
-            // 延迟检查cookies状态，等待认证完成
-            setTimeout(checkCookiesStatus, 1000);
+        // 页面加载完成后初始化 - 使用Flask-Login
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 使用Flask-Login认证状态检查
+            if (typeof window.ensureAuthSync === 'function') {
+                const isAuthenticated = await window.ensureAuthSync();
+                if (isAuthenticated) {
+                    // 认证成功，初始化页面
+                    initializeAdminPage();
+                } else {
+                    // 认证失败，跳转到登录页
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } else {
+                // 检查基本认证状态
+                if (isAuthenticated && currentUser) {
+                    initializeAdminPage();
+                } else {
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            }
         });
 
-        // 检查认证状态
-        async function checkAuth() {
-            try {
-                // 如果没有token，直接跳转到登录页
-                if (!authToken) {
-                    console.log('❌ 没有认证token，跳转到登录页');
-                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-                    return;
+        // 初始化管理页面 - 使用Flask-Login
+        function initializeAdminPage() {
+            console.log('✅ 开始初始化管理页面');
+
+            // 设置用户名（如果元素存在）
+            if (currentUser) {
+                const usernameElement = document.getElementById('username');
+                if (usernameElement) {
+                    usernameElement.textContent = currentUser;
                 }
 
-                const response = await fetch('/api/auth/verify', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.valid) {
-                        console.log('✅ 认证成功，用户:', data.username);
-                        document.getElementById('username').textContent = data.username;
-
-                        // 认证成功后初始化其他组件
-                        initializeTabs();
-                        loadConfig();
-                        loadStorageInfo();
-                        loadVersionInfo();
-                        refreshSessionInfo();
-                        return;
-                    }
+                // 设置当前用户名到表单
+                const currentUsernameElement = document.getElementById('current-username');
+                if (currentUsernameElement) {
+                    currentUsernameElement.value = currentUser;
                 }
 
-                // 认证失败，清除token并跳转到登录页
-                console.log('❌ 认证失败，清除token并跳转到登录页');
-                localStorage.removeItem('auth_token');
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-            } catch (error) {
-                console.error('认证检查失败:', error);
-                localStorage.removeItem('auth_token');
-                window.location.href = '/login';
+                console.log('👤 当前用户:', currentUser);
             }
+
+            // 初始化各个组件
+            initializeTabs();
+            loadConfig();
+            loadStorageInfo();
+            loadVersionInfo();
+            refreshSessionInfo();
+            // 延迟检查cookies状态
+            setTimeout(checkCookiesStatus, 1000);
         }
+
+        // 旧的认证检查函数已删除，使用Flask-Login
 
         // 初始化标签页
         function initializeTabs() {
@@ -737,13 +774,11 @@
             }
         }
 
-        // 加载存储信息
+        // 加载存储信息 - 使用Flask-Login
         async function loadStorageInfo() {
             try {
                 const response = await fetch('/api/admin/storage-info', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    credentials: 'same-origin'  // 使用cookies认证
                 });
 
                 if (response.ok) {
@@ -786,16 +821,15 @@
             showMessage('存储信息已刷新');
         }
 
-        // 手动清理
+        // 手动清理 - 使用Flask-Login
         async function manualCleanup() {
             setLoading('cleanup-text', 'cleanup-loading', true);
 
             try {
                 const response = await fetch('/api/admin/cleanup', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'  // 使用cookies认证
                 });
 
                 if (response.ok) {
@@ -813,19 +847,49 @@
             }
         }
 
-        // 加载版本信息
+        // 强制清理 - 删除除最新1个文件外的所有文件
+        async function forceCleanup() {
+            if (!confirm('确定要强制清理吗？这将删除除最新1个文件外的所有下载文件！')) {
+                return;
+            }
+
+            setLoading('force-cleanup-text', 'force-cleanup-loading', true);
+
+            try {
+                const response = await fetch('/api/admin/cleanup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ force: true })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(`强制清理完成！删除了 ${data.cleaned_files} 个文件`);
+                    updateStorageDisplay(data.storage_info);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || '强制清理失败', 'error');
+                }
+            } catch (error) {
+                showMessage('强制清理过程中出现错误', 'error');
+            } finally {
+                setLoading('force-cleanup-text', 'force-cleanup-loading', false);
+            }
+        }
+
+        // 加载版本信息 - 使用Flask-Login
         async function loadVersionInfo() {
             try {
                 const response = await fetch('/api/admin/version', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    credentials: 'same-origin'  // 使用cookies认证
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success && data.version_info) {
-                        document.getElementById('current-version').textContent = data.version_info.app_version;
+                        // 显示yt-dlp版本，不是app版本
+                        document.getElementById('current-version').textContent = data.version_info.ytdlp_version;
                         document.getElementById('last-update').textContent = data.version_info.last_updated;
                     }
                 }
@@ -840,9 +904,7 @@
 
             try {
                 const response = await fetch('/api/admin/update-check', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -866,43 +928,65 @@
 
         // 开始更新
         async function startUpdate() {
-            if (!confirm('确定要开始更新吗？更新过程中服务可能会短暂中断。')) {
+            if (!confirm('确定要开始更新yt-dlp吗？更新过程可能需要1-2分钟。')) {
                 return;
             }
 
+            // 显示更新进度
+            const updateBtn = document.getElementById('update-btn');
+            const originalText = updateBtn.innerHTML;
+            updateBtn.innerHTML = '更新中...';
+            updateBtn.disabled = true;
+
             try {
+                showMessage('正在更新yt-dlp，请稍候...', 'warning');
+
                 const response = await fetch('/api/admin/update', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
                 });
 
-                if (response.ok) {
-                    showMessage('更新已开始，请稍后刷新页面查看结果', 'warning');
-                    document.getElementById('update-btn').style.display = 'none';
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    if (data.updated) {
+                        showMessage(`✅ ${data.message}`, 'success');
+                        // 刷新版本信息
+                        setTimeout(() => {
+                            loadVersionInfo();
+                        }, 1000);
+                    } else {
+                        showMessage(`ℹ️ ${data.message}`, 'info');
+                    }
+                    updateBtn.style.display = 'none';
                 } else {
-                    showMessage('启动更新失败', 'error');
+                    const errorMsg = data.error || '更新失败';
+                    showMessage(`❌ ${errorMsg}`, 'error');
+                    console.error('更新失败详情:', data.details);
                 }
             } catch (error) {
-                showMessage('更新过程中出现错误', 'error');
+                showMessage('❌ 更新过程中出现网络错误', 'error');
+                console.error('更新错误:', error);
+            } finally {
+                // 恢复按钮状态
+                updateBtn.innerHTML = originalText;
+                updateBtn.disabled = false;
             }
         }
 
-        // 登出
+        // 登出 - 使用Flask-Login
         async function logout() {
             try {
-                await fetch('/api/auth/logout', {
+                await fetch('/logout', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
                 });
             } catch (error) {
                 console.error('登出请求失败:', error);
             }
 
-            localStorage.removeItem('auth_token');
             window.location.href = '/login';
         }
 
@@ -910,9 +994,8 @@
         async function loadConfig() {
             try {
                 const response = await fetch('/api/admin/cleanup-config', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -955,10 +1038,8 @@
             try {
                 const response = await fetch('/api/admin/cleanup-config', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify(config)
                 });
 
@@ -1024,9 +1105,8 @@
             try {
                 const response = await fetch('/api/admin/cleanup', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -1068,10 +1148,8 @@
             try {
                 const response = await fetch('/api/auth/change-password', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({
                         current_password: currentPassword,
                         new_password: newPassword,
@@ -1099,13 +1177,79 @@
             document.getElementById('change-password-form').reset();
         }
 
+        // 用户名修改功能
+        document.getElementById('change-username-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const newUsername = document.getElementById('new-username').value.trim();
+            const password = document.getElementById('username-password').value;
+
+            // 验证用户名格式
+            const usernamePattern = /^[a-zA-Z0-9_]+$/;
+            if (!usernamePattern.test(newUsername)) {
+                showMessage('用户名只能包含字母、数字和下划线', 'error');
+                return;
+            }
+
+            if (newUsername.length < 3 || newUsername.length > 20) {
+                showMessage('用户名长度必须在3-20位之间', 'error');
+                return;
+            }
+
+            if (newUsername === currentUser) {
+                showMessage('新用户名不能与当前用户名相同', 'error');
+                return;
+            }
+
+            if (!password) {
+                showMessage('请输入当前密码以确认修改', 'error');
+                return;
+            }
+
+            setLoading('change-username-text', 'change-username-loading', true);
+
+            try {
+                const response = await fetch('/api/auth/change-username', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        new_username: newUsername,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('用户名修改成功！即将重新登录...', 'success');
+                    clearUsernameForm();
+
+                    // 延迟跳转到登录页面
+                    setTimeout(() => {
+                        window.location.href = '/login?message=' + encodeURIComponent('用户名已更新，请使用新用户名登录');
+                    }, 2000);
+                } else {
+                    showMessage(data.error || '用户名修改失败', 'error');
+                }
+            } catch (error) {
+                showMessage('修改用户名时出现错误', 'error');
+            } finally {
+                setLoading('change-username-text', 'change-username-loading', false);
+            }
+        });
+
+        // 清空用户名表单
+        function clearUsernameForm() {
+            document.getElementById('new-username').value = '';
+            document.getElementById('username-password').value = '';
+        }
+
         // 刷新会话信息
         async function refreshSessionInfo() {
             try {
                 const response = await fetch('/api/auth/session-info', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -1136,15 +1280,14 @@
             try {
                 const response = await fetch('/api/auth/clear-all-sessions', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
                     showMessage('所有会话已清除，即将重新登录...', 'warning');
                     setTimeout(() => {
-                        localStorage.removeItem('auth_token');
+                        // Token清理已移除，使用Flask-Login
                         window.location.href = '/login';
                     }, 2000);
                 } else {
@@ -1153,6 +1296,16 @@
             } catch (error) {
                 showMessage('清除会话时出现错误', 'error');
             }
+        }
+
+        // 导航到Cookies管理页面
+        function navigateToCookiesManager() {
+            window.location.href = '/admin/cookies-manager';
+        }
+
+        // 导航到Telegram设置页面
+        function navigateToTelegramSettings() {
+            window.location.href = '/admin/telegram-settings';
         }
 
         // 检查cookies状态
@@ -1170,9 +1323,7 @@
 
             try {
                 const response = await fetch('/api/cookies/status', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+                    credentials: 'same-origin'
                 });
 
                 if (response.ok) {
@@ -1208,9 +1359,7 @@
 
                     // 测试有效性
                     const testResponse = await fetch('/api/cookies/test', {
-                        headers: {
-                            'Authorization': `Bearer ${authToken}`
-                        }
+                        credentials: 'same-origin'
                     });
 
                     if (testResponse.ok) {

@@ -269,20 +269,20 @@ setup_config() {
     # 设置 Dockerfile
     case $STRATEGY in
         build-time)
-            DOCKERFILE="Dockerfile.build-time"
-            REQUIREMENTS_FILE="requirements.github.txt"
+            DOCKERFILE="dockerfiles/Dockerfile.build-time"
+            REQUIREMENTS_FILE="requirements/requirements.github.txt"
             ;;
         runtime)
-            DOCKERFILE="Dockerfile.runtime"
-            REQUIREMENTS_FILE="requirements.runtime.txt"
+            DOCKERFILE="dockerfiles/Dockerfile.runtime"
+            REQUIREMENTS_FILE="requirements/requirements.runtime.txt"
             ;;
         hybrid)
-            DOCKERFILE="Dockerfile.hybrid"
-            REQUIREMENTS_FILE="requirements.hybrid.txt"
+            DOCKERFILE="dockerfiles/Dockerfile.hybrid"
+            REQUIREMENTS_FILE="requirements/requirements.hybrid.txt"
             ;;
         local)
-            DOCKERFILE="Dockerfile.local"
-            REQUIREMENTS_FILE="requirements.local.txt"
+            DOCKERFILE="dockerfiles/Dockerfile.local-ytdlp"
+            REQUIREMENTS_FILE="requirements/requirements.local.txt"
             ;;
     esac
 

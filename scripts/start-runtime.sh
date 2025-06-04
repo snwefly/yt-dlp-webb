@@ -68,6 +68,46 @@ for dir in "/app/downloads" "/app/config" "/app/logs" "/app/yt-dlp-cache"; do
     fi
 done
 
+# 设置YouTube cookies文件（容器环境优化）
+log_info "🍪 设置YouTube cookies配置..."
+
+# 检查是否有用户提供的cookies文件
+if [ -f "/app/config/youtube_cookies.txt" ]; then
+    log_success "发现用户提供的cookies文件"
+    chmod 644 /app/config/youtube_cookies.txt
+elif [ -f "/app/webapp/config/youtube_cookies.txt" ]; then
+    cp /app/webapp/config/youtube_cookies.txt /app/config/youtube_cookies.txt
+    chmod 644 /app/config/youtube_cookies.txt
+    log_success "cookies文件已复制到 /app/config/"
+else
+    log_info "未找到cookies文件，将使用android_vr客户端（无需cookies）"
+    log_info "💡 提示：如需下载需要登录的内容，请将cookies保存到 /app/config/youtube_cookies.txt"
+    log_info "📖 参考：https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies"
+
+    # 创建示例文件供参考
+    if [ -f "/app/config/youtube_cookies.txt.example" ]; then
+        log_info "cookies示例文件已存在"
+    else
+        cat > /app/config/youtube_cookies.txt.example << 'EOF'
+# YouTube Cookies 示例文件
+# 将此文件重命名为 youtube_cookies.txt 并填入真实cookies
+#
+# 获取方法：
+# 1. 浏览器扩展：Get cookies.txt
+# 2. yt-dlp命令：--cookies-from-browser chrome
+# 3. 开发者工具手动复制
+#
+# 格式：domain	flag	path	secure	expiration	name	value
+# .youtube.com	TRUE	/	TRUE	1234567890	VISITOR_INFO1_LIVE	your_value_here
+EOF
+        chmod 644 /app/config/youtube_cookies.txt.example
+        log_success "cookies示例文件已创建"
+    fi
+fi
+
+# 设置容器环境标识
+export CONTAINER=true
+
 # 使用通用 yt-dlp 安装脚本
 log_info "🔧 安装和验证 yt-dlp..."
 if [ -f "/app/scripts/ytdlp_installer.sh" ]; then

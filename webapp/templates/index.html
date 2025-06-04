@@ -341,6 +341,26 @@
                                         <option value="ko">韩文</option>
                                     </select>
                                 </div>
+
+                                <!-- Telegram Push Options -->
+                                <div class="mb-3" id="telegramOptions">
+                                    <label class="form-label fw-semibold">
+                                        <i class="fab fa-telegram me-1"></i>Telegram推送
+                                    </label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="telegram-push" checked>
+                                        <label class="form-check-label" for="telegram-push">
+                                            启用Telegram推送
+                                        </label>
+                                    </div>
+                                    <div class="mt-2" id="telegramModeOptions">
+                                        <select class="form-select form-select-sm" id="telegram-push-mode">
+                                            <option value="file">发送文件</option>
+                                            <option value="notification">仅通知</option>
+                                            <option value="both">文件+通知</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -357,93 +377,41 @@
             console.log('服务器认证状态:', isAuthenticated);
             console.log('当前用户:', currentUser);
 
-            // 检查 localStorage 中的 token
-            const token = getAuthToken();
-            console.log('localStorage token:', token ? '存在' : '不存在');
+            // 使用Flask-Login，认证状态已从服务器端传递
+            console.log('ℹ️ 使用Flask-Login认证状态，无需token检查');
 
-            // 如果有token，始终确保认证状态同步（无论服务器端状态如何）
-            if (token) {
-                console.log('🔄 检测到localStorage token，确保认证状态同步...');
-
-                // 使用全局的认证同步函数
-                if (window.ensureAuthSync) {
-                    const syncSuccess = await window.ensureAuthSync();
-                    if (syncSuccess) {
-                        console.log('✅ 认证状态同步成功');
-
-                        // 验证token并获取用户信息
-                        const tokenValid = await validateToken();
-                        if (tokenValid) {
-                            isAuthenticated = true;
-                            try {
-                                const response = await axios.get('/api/auth/verify', {
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                });
-                                if (response.data.valid) {
-                                    currentUser = response.data.username;
-                                    console.log('✅ 已更新用户信息:', currentUser);
-                                }
-                            } catch (error) {
-                                console.log('⚠️ 获取用户信息失败:', error);
-                            }
-                        }
-                    } else {
-                        console.log('❌ 认证状态同步失败，token已清理');
-                        isAuthenticated = false;
-                        currentUser = null;
-                    }
-                }
-            } else {
-                console.log('ℹ️ 无localStorage token，保持当前认证状态');
-                // 如果没有token但服务器端显示已认证，可能是session残留，清理状态
-                if (isAuthenticated) {
-                    console.log('⚠️ 无token但服务器端显示已认证，清理认证状态');
-                    isAuthenticated = false;
-                    currentUser = null;
-                }
-            }
+            // Flask-Login会自动处理认证状态，无需额外检查
 
             // 绑定事件
             bindEvents();
 
-            // 显示欢迎消息和检查状态
-            if (isUserAuthenticated()) {
-                console.log('✅ 用户已认证，显示欢迎消息');
-                showMessage('欢迎使用 yt-dlp Web 下载器！', 'success');
-                // 检查cookies状态
-                checkCookiesStatus();
-
-
-            } else {
-                console.log('ℹ️ 用户未认证，显示访客消息');
-                showMessage('您正在以访客模式浏览，登录后可使用下载功能。', 'info');
+            // 刷新导航栏状态
+            if (window.refreshNavigation) {
+                window.refreshNavigation();
             }
+
+            // 显示欢迎消息
+            console.log('✅ 欢迎使用下载器');
+            showMessage(`欢迎 ${currentUser || '用户'}！您可以使用 yt-dlp Web 下载器下载视频。`, 'success');
+
+            // 检查cookies状态
+            checkCookiesStatus();
+
+            // 检查Telegram状态
+            checkTelegramStatus();
         });
 
 
 
-        // 检查cookies状态
+        // 检查cookies状态 - 使用Flask-Login
         async function checkCookiesStatus() {
             if (!isUserAuthenticated()) {
                 return;
             }
 
-            // 确保认证状态同步
-            if (window.ensureAuthSync) {
-                console.log('🔄 检查cookies前确保认证状态同步...');
-                const syncSuccess = await window.ensureAuthSync();
-                if (!syncSuccess) {
-                    console.log('❌ 认证状态同步失败，跳过cookies检查');
-                    return;
-                }
-            }
-
             try {
-                const token = getAuthToken();
                 const response = await axios.get('/api/cookies/status', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                    withCredentials: true  // 使用cookies认证
                 });
 
                 if (response.data.success) {
@@ -498,6 +466,49 @@
             warningAlert.classList.remove('d-none');
         }
 
+        // 检查Telegram状态
+        async function checkTelegramStatus() {
+            try {
+                const response = await axios.get('/api/telegram/status', {
+                    withCredentials: true
+                });
+
+                if (response.data.success) {
+                    updateTelegramOptionsDisplay(response.data);
+                }
+            } catch (error) {
+                console.log('检查Telegram状态失败:', error);
+                // 如果检查失败，隐藏Telegram选项
+                const telegramOptions = document.getElementById('telegramOptions');
+                if (telegramOptions) {
+                    telegramOptions.style.display = 'none';
+                }
+            }
+        }
+
+        // 更新Telegram选项显示
+        function updateTelegramOptionsDisplay(status) {
+            const telegramOptions = document.getElementById('telegramOptions');
+            const telegramPush = document.getElementById('telegram-push');
+            const telegramModeOptions = document.getElementById('telegramModeOptions');
+
+            if (status.enabled) {
+                // Telegram已配置，显示选项
+                telegramOptions.style.display = 'block';
+
+                // 绑定切换事件
+                telegramPush.addEventListener('change', function() {
+                    telegramModeOptions.style.display = this.checked ? 'block' : 'none';
+                });
+
+                // 初始状态
+                telegramModeOptions.style.display = telegramPush.checked ? 'block' : 'none';
+            } else {
+                // Telegram未配置，隐藏选项
+                telegramOptions.style.display = 'none';
+            }
+        }
+
         // 绑定事件
         function bindEvents() {
             // cookies状态检查按钮
@@ -536,26 +547,6 @@
 
         // 获取视频信息
         async function getVideoInfo() {
-            // 检查认证状态
-            if (!isUserAuthenticated()) {
-                console.log('❌ 认证失败，需要登录');
-                showLoginRequired('查看视频信息');
-                return;
-            }
-
-            const token = getAuthToken();
-
-            // 确保认证状态同步
-            if (window.ensureAuthSync) {
-                console.log('🔄 API调用前确保认证状态同步...');
-                const syncSuccess = await window.ensureAuthSync();
-                if (!syncSuccess) {
-                    console.log('❌ 认证状态同步失败，需要重新登录');
-                    showLoginRequired('查看视频信息');
-                    return;
-                }
-            }
-
             const url = document.getElementById('url').value.trim();
             if (!url) {
                 showMessage('请输入视频链接', 'error');
@@ -572,13 +563,10 @@
             text.textContent = '获取中...';
 
             try {
-                console.log('📤 发送视频信息请求，使用token:', token ? '存在' : '不存在');
+                console.log('📤 发送视频信息请求');
+
                 const response = await axios.post('/api/info', {
                     url: url
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
                 });
 
                 if (response.data.success) {
@@ -589,11 +577,7 @@
                 }
             } catch (error) {
                 console.error('获取视频信息失败:', error);
-                if (error.response?.status === 401) {
-                    showLoginRequired('获取视频信息');
-                } else {
-                    showMessage('获取视频信息失败: ' + (error.response?.data?.error || error.message), 'error');
-                }
+                showMessage('获取视频信息失败: ' + (error.response?.data?.error || error.message), 'error');
             } finally {
                 // 恢复按钮状态
                 btn.disabled = false;
@@ -606,24 +590,10 @@
         async function startDownload() {
             console.log('🎯 开始下载函数被调用');
 
-            // 检查认证状态
+            // 检查是否已登录
             if (!isUserAuthenticated()) {
-                console.log('❌ 认证失败，需要登录');
                 showLoginRequired('下载视频');
                 return;
-            }
-
-            const token = getAuthToken();
-
-            // 确保认证状态同步
-            if (window.ensureAuthSync) {
-                console.log('🔄 下载前确保认证状态同步...');
-                const syncSuccess = await window.ensureAuthSync();
-                if (!syncSuccess) {
-                    console.log('❌ 认证状态同步失败，需要重新登录');
-                    showLoginRequired('下载视频');
-                    return;
-                }
             }
 
             const url = document.getElementById('url').value.trim();
@@ -653,17 +623,14 @@
                     download_description: document.getElementById('download-description').checked,
                     download_playlist: document.getElementById('download-playlist').checked,
                     subtitle_lang: document.getElementById('subtitle-lang').value,
+                    telegram_push: document.getElementById('telegram-push').checked,
+                    telegram_push_mode: document.getElementById('telegram-push-mode').value,
                     preset: 'custom'
                 };
 
                 console.log('📤 发送下载请求:', downloadOptions);
-                console.log('🔑 使用 token:', token ? '存在' : '不存在');
 
-                const response = await axios.post('/api/download', downloadOptions, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                const response = await axios.post('/api/download', downloadOptions);
 
                 console.log('📥 下载响应:', response.data);
 
@@ -689,14 +656,9 @@
                     message: error.message
                 });
 
-                if (error.response?.status === 401) {
-                    console.log('🔐 认证失败，显示登录提示');
-                    showLoginRequired('下载视频');
-                } else {
-                    const errorMsg = error.response?.data?.error || error.message || '未知错误';
-                    console.log('💥 显示错误消息:', errorMsg);
-                    showMessage('下载失败: ' + errorMsg, 'error');
-                }
+                const errorMsg = error.response?.data?.error || error.message || '未知错误';
+                console.log('💥 显示错误消息:', errorMsg);
+                showMessage('下载失败: ' + errorMsg, 'error');
             } finally {
                 // 恢复按钮状态
                 btn.disabled = false;
@@ -845,24 +807,24 @@
             // 每2秒检查一次下载状态
             const interval = setInterval(async () => {
                 try {
-                    const token = getAuthToken();
-                    const response = await axios.get(`/api/download/${downloadId}/status`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
+                    console.log(`🔄 检查下载状态: ${downloadId}`);
+                    const response = await axios.get(`/api/download/${downloadId}/status`);
+                    console.log('📥 状态响应:', response.data);
 
                     if (response.data) {
                         updateDownloadProgress(response.data);
 
                         // 如果下载完成或失败，停止监控
                         if (response.data.status === 'completed' || response.data.status === 'failed') {
+                            console.log(`✅ 下载结束，停止监控: ${response.data.status}`);
                             clearInterval(interval);
                             handleDownloadComplete(response.data);
                         }
+                    } else {
+                        console.warn('⚠️ 收到空的状态响应');
                     }
                 } catch (error) {
-                    console.error('获取下载状态失败:', error);
+                    console.error('❌ 获取下载状态失败:', error);
                     clearInterval(interval);
                 }
             }, 2000);
@@ -870,12 +832,27 @@
 
         // 更新下载进度
         function updateDownloadProgress(downloadData) {
+            console.log('🔍 收到下载数据:', downloadData);
+
             const progressFill = document.getElementById('progress-fill');
             const progressText = document.getElementById('progress-text');
             const downloadSpeed = document.getElementById('download-speed');
             const fileSize = document.getElementById('file-size');
             const eta = document.getElementById('eta');
             const downloadStatus = document.getElementById('download-status');
+
+            // 检查元素是否存在
+            if (!progressFill || !progressText || !downloadSpeed || !fileSize || !eta || !downloadStatus) {
+                console.error('❌ 找不到进度显示元素:', {
+                    progressFill: !!progressFill,
+                    progressText: !!progressText,
+                    downloadSpeed: !!downloadSpeed,
+                    fileSize: !!fileSize,
+                    eta: !!eta,
+                    downloadStatus: !!downloadStatus
+                });
+                return;
+            }
 
             // 更新进度条
             const progress = downloadData.progress || 0;
@@ -903,22 +880,37 @@
             downloadStatus.textContent = statusText;
 
             // 更新下载信息
-            if (downloadData.speed) {
-                downloadSpeed.textContent = formatSpeed(downloadData.speed);
+            if (downloadData.speed && downloadData.speed > 0) {
+                const speedText = formatSpeed(downloadData.speed);
+                downloadSpeed.textContent = speedText;
+                console.log('📊 更新速度:', speedText);
+            } else {
+                console.log('📊 无速度数据:', downloadData.speed);
             }
 
-            if (downloadData.total_bytes) {
-                fileSize.textContent = formatFileSize(downloadData.total_bytes);
+            if (downloadData.total_bytes && downloadData.total_bytes > 0) {
+                const sizeText = formatFileSize(downloadData.total_bytes);
+                fileSize.textContent = sizeText;
+                console.log('📊 更新文件大小:', sizeText);
+            } else {
+                console.log('📊 无文件大小数据:', downloadData.total_bytes);
             }
 
-            if (downloadData.eta) {
-                eta.textContent = formatTime(downloadData.eta);
+            if (downloadData.eta && downloadData.eta > 0) {
+                const etaText = formatTime(downloadData.eta);
+                eta.textContent = etaText;
+                console.log('📊 更新剩余时间:', etaText);
+            } else {
+                console.log('📊 无剩余时间数据:', downloadData.eta);
             }
 
-            console.log('📊 进度更新:', {
+            console.log('📊 进度更新完成:', {
                 progress: progress,
                 status: downloadData.status,
-                filename: downloadData.filename
+                filename: downloadData.filename,
+                speed: downloadData.speed,
+                total_bytes: downloadData.total_bytes,
+                eta: downloadData.eta
             });
         }
 
@@ -966,8 +958,8 @@
                 confirmButtonColor: '#dc3545'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    localStorage.removeItem('auth_token');
-                    window.location.href = '/login';
+                    // 使用Flask-Login的登出
+                    logout();
                 }
             });
         }

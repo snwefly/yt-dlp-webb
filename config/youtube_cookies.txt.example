@@ -1,0 +1,27 @@
+# YouTube Cookies 文件示例
+# 
+# 这是一个示例文件，展示如何配置 YouTube cookies
+# 将此文件重命名为 youtube_cookies.txt 并填入真实的 cookies 数据
+#
+# 获取 cookies 的方法：
+# 1. 使用浏览器扩展（如 Get cookies.txt）
+# 2. 使用 yt-dlp 的 --cookies-from-browser 选项导出
+# 3. 手动从浏览器开发者工具复制
+#
+# 格式说明：
+# 每行一个 cookie，格式为：
+# domain	flag	path	secure	expiration	name	value
+#
+# 示例（请替换为真实数据）：
+# .youtube.com	TRUE	/	TRUE	1234567890	VISITOR_INFO1_LIVE	abcdefghijklmnop
+# .youtube.com	TRUE	/	TRUE	1234567890	YSC	qrstuvwxyz123456
+# .youtube.com	TRUE	/	FALSE	1234567890	PREF	f1=50000000
+#
+# 重要提示：
+# - 请确保 cookies 来自已登录的 YouTube 账户
+# - 定期更新 cookies，因为它们会过期
+# - 不要分享包含真实 cookies 的文件
+# - 此文件应该设置适当的权限（如 600）
+
+# 如果您不需要下载需要登录的内容，可以删除此文件
+# 项目会自动使用 android_vr 客户端，无需 cookies

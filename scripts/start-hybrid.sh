@@ -68,6 +68,29 @@ for dir in "/app/downloads" "/app/config" "/app/logs" "/app/yt-dlp-cache"; do
     fi
 done
 
+# 设置YouTube cookies文件
+log_info "🍪 设置YouTube cookies文件..."
+if [ -f "/app/webapp/config/youtube_cookies.txt" ]; then
+    cp /app/webapp/config/youtube_cookies.txt /app/config/youtube_cookies.txt
+    chmod 644 /app/config/youtube_cookies.txt
+    log_success "cookies文件已复制到 /app/config/"
+else
+    log_warning "未找到cookies模板文件，创建基础cookies文件"
+    cat > /app/config/youtube_cookies.txt << 'EOF'
+# Netscape HTTP Cookie File
+# This is a generated file! Do not edit.
+
+# YouTube基础cookies - 根据官方FAQ配置以避免bot检测
+# 格式: domain	domain_specified	path	secure	expiration	name	value
+.youtube.com	TRUE	/	TRUE	1767225600	CONSENT	YES+cb.20210328-17-p0.en+FX+667
+.youtube.com	TRUE	/	FALSE	1767225600	PREF	tz=UTC&hl=en&f1=50000000
+.youtube.com	TRUE	/	TRUE	1767225600	SOCS	CAI
+.youtube.com	TRUE	/	FALSE	1767225600	VISITOR_INFO1_LIVE	fPQ4jCL6EiE
+EOF
+    chmod 644 /app/config/youtube_cookies.txt
+    log_success "基础cookies文件已创建"
+fi
+
 # 检查构建时下载状态
 log_info "🔍 检查构建时下载状态..."
 

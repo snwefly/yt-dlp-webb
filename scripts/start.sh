@@ -36,6 +36,29 @@ mkdir -p /app/config
 mkdir -p /app/logs
 mkdir -p /app/yt-dlp-cache
 
+# 设置cookies文件
+echo "🍪 设置YouTube cookies文件..."
+if [ -f "/app/webapp/config/youtube_cookies.txt" ]; then
+    cp /app/webapp/config/youtube_cookies.txt /app/config/youtube_cookies.txt
+    chmod 644 /app/config/youtube_cookies.txt
+    echo "✅ cookies文件已复制到 /app/config/"
+else
+    echo "⚠️ 未找到cookies模板文件，创建基础cookies文件"
+    cat > /app/config/youtube_cookies.txt << 'EOF'
+# Netscape HTTP Cookie File
+# This is a generated file! Do not edit.
+
+# YouTube基础cookies - 根据官方FAQ配置以避免bot检测
+# 格式: domain	domain_specified	path	secure	expiration	name	value
+.youtube.com	TRUE	/	TRUE	1767225600	CONSENT	YES+cb.20210328-17-p0.en+FX+667
+.youtube.com	TRUE	/	FALSE	1767225600	PREF	tz=UTC&hl=en&f1=50000000
+.youtube.com	TRUE	/	TRUE	1767225600	SOCS	CAI
+.youtube.com	TRUE	/	FALSE	1767225600	VISITOR_INFO1_LIVE	fPQ4jCL6EiE
+EOF
+    chmod 644 /app/config/youtube_cookies.txt
+    echo "✅ 基础cookies文件已创建"
+fi
+
 # 强制修复目录权限
 echo "📁 下载目录: $DOWNLOAD_FOLDER"
 echo "👤 当前用户: $(whoami)"
@@ -128,11 +151,36 @@ fi
 echo "🌐 启动Web服务器..."
 cd /app
 
+# 测试应用是否可以正确导入
+echo "🧪 测试应用导入..."
+python3 -c "
+import sys
+sys.path.insert(0, '/app')
+try:
+    from webapp.app import create_app
+    app = create_app()
+    print('✅ 应用创建成功')
+    print(f'✅ 注册的路由数量: {len(app.url_map._rules)}')
+    for rule in app.url_map.iter_rules():
+        print(f'  - {rule.rule} -> {rule.endpoint}')
+except Exception as e:
+    print(f'❌ 应用创建失败: {e}')
+    import traceback
+    traceback.print_exc()
+    exit(1)
+"
+
 # 使用 gunicorn 启动（生产环境）
 if command -v gunicorn &> /dev/null; then
     echo "使用 Gunicorn 启动..."
-    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 webapp.app:app
+    exec gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 --access-logfile - --error-logfile - webapp.app:app
 else
     echo "使用 Flask 开发服务器启动..."
-    python3 -m webapp.server --host 0.0.0.0 --port 8080 --no-browser
+    exec python3 -c "
+import sys
+sys.path.insert(0, '/app')
+from webapp.app import create_app
+app = create_app()
+app.run(host='0.0.0.0', port=8080, debug=False)
+"
 fi

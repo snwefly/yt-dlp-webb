@@ -7,11 +7,8 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>🍪 YouTube Cookies管理</h2>
+                <h2>🍪 Cookies管理</h2>
                 <div>
-                    <button id="refreshStatus" class="btn btn-outline-primary">
-                        <i class="fas fa-sync-alt"></i> 刷新状态
-                    </button>
                     <a href="/admin" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> 返回管理
                     </a>
@@ -20,38 +17,29 @@
 
             <!-- 状态卡片 -->
             <div class="row mb-4">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="card border-primary">
                         <div class="card-body text-center">
                             <h5 class="card-title">Cookies状态</h5>
                             <div id="cookiesStatusBadge" class="mb-2">
                                 <span class="badge bg-secondary">检查中...</span>
                             </div>
+                            <button id="refreshStatus" class="btn btn-sm btn-primary">
+                                <i class="fas fa-sync-alt"></i> 刷新
+                            </button>
                             <p id="cookiesStatusText" class="card-text text-muted">正在检查状态...</p>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="card border-info">
-                        <div class="card-body text-center">
-                            <h5 class="card-title">有效性测试</h5>
-                            <div id="validityBadge" class="mb-2">
-                                <span class="badge bg-secondary">未测试</span>
-                            </div>
-                            <button id="testCookies" class="btn btn-sm btn-info">
-                                <i class="fas fa-vial"></i> 测试
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4">
+
+                <div class="col-md-6">
                     <div class="card border-success">
                         <div class="card-body text-center">
-                            <h5 class="card-title">备份数量</h5>
-                            <div id="backupCount" class="mb-2">
+                            <h5 class="card-title">平台数量</h5>
+                            <div id="platformCount" class="mb-2">
                                 <span class="badge bg-secondary">0</span>
                             </div>
-                            <button id="refreshBackups" class="btn btn-sm btn-success">
+                            <button id="refreshPlatforms" class="btn btn-sm btn-success">
                                 <i class="fas fa-list"></i> 查看
                             </button>
                         </div>
@@ -67,8 +55,8 @@
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button">
-                        <i class="fas fa-archive"></i> 备份管理
+                    <button class="nav-link" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage" type="button">
+                        <i class="fas fa-cogs"></i> Cookies管理
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -93,6 +81,52 @@
                                     <li><strong>Netscape格式:</strong> 标准的cookies.txt格式</li>
                                     <li><strong>自动检测:</strong> 系统会自动识别格式并转换</li>
                                 </ul>
+                            </div>
+
+                            <!-- 导入模式选择 -->
+                            <div class="mb-3">
+                                <label class="form-label">导入模式</label>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="importMode" id="modeStandard" value="standard" checked>
+                                            <label class="form-check-label" for="modeStandard">
+                                                <strong>标准模式</strong><br>
+                                                <small class="text-muted">自动转换格式，按平台分离</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="importMode" id="modePreserve" value="preserve">
+                                            <label class="form-check-label" for="modePreserve">
+                                                <strong>保持格式</strong><br>
+                                                <small class="text-muted">保持原始格式，仅清理过期</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="importMode" id="modeRaw" value="raw">
+                                            <label class="form-check-label" for="modeRaw">
+                                                <strong>原始模式</strong><br>
+                                                <small class="text-muted">完全保持原样，不做转换</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 平台选择（仅原始模式显示） -->
+                            <div class="mb-3" id="platformSelection" style="display: none;">
+                                <label for="targetPlatform" class="form-label">目标平台</label>
+                                <select class="form-select" id="targetPlatform">
+                                    <option value="youtube">📺 YouTube</option>
+                                    <option value="twitter">🐦 Twitter/X</option>
+                                    <option value="instagram">📷 Instagram</option>
+                                    <option value="tiktok">🎵 TikTok</option>
+                                    <option value="bilibili">📺 Bilibili</option>
+                                </select>
                             </div>
 
                             <div class="row mb-3">
@@ -134,16 +168,25 @@
 .youtube.com	TRUE	/	FALSE	1234567890	SID	value"></textarea>
                             </div>
 
+                            <div class="mb-3">
+                                <div class="form-text">
+                                    <small>
+                                        <strong>完整备份模式</strong>：自动备份所有cookies并按平台分离到独立文件<br>
+                                        <small class="text-muted">
+                                            支持平台：YouTube、Twitter/X、Instagram、TikTok、Bilibili等<br>
+                                            下载时系统根据URL智能选择对应平台的cookies文件
+                                        </small>
+                                    </small>
+                                </div>
+                            </div>
+
                             <div class="row">
-                                <div class="col-md-6">
-                                    <button id="validateCookies" class="btn btn-outline-primary">
-                                        <i class="fas fa-check"></i> 验证格式
-                                    </button>
-                                    <button id="importCookies" class="btn btn-success ms-2">
+                                <div class="col-md-8">
+                                    <button id="importCookies" class="btn btn-success">
                                         <i class="fas fa-upload"></i> 导入Cookies
                                     </button>
                                 </div>
-                                <div class="col-md-6 text-end">
+                                <div class="col-md-4 text-end">
                                     <small class="text-muted">导入前会自动备份现有cookies</small>
                                 </div>
                             </div>
@@ -153,25 +196,28 @@
                     </div>
                 </div>
 
-                <!-- 备份管理标签页 -->
-                <div class="tab-pane fade" id="backup" role="tabpanel">
+                <!-- Cookies管理标签页 -->
+                <div class="tab-pane fade" id="manage" role="tabpanel">
                     <div class="card mt-3">
                         <div class="card-header">
-                            <h5><i class="fas fa-archive"></i> Cookies备份管理</h5>
+                            <h5><i class="fas fa-cogs"></i> Cookies管理</h5>
                         </div>
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <div>
-                                    <button id="refreshBackupsList" class="btn btn-primary">
+                                    <button id="refreshCookiesList" class="btn btn-primary">
                                         <i class="fas fa-sync-alt"></i> 刷新列表
                                     </button>
+                                    <button id="testAllCookies" class="btn btn-success ms-2">
+                                        <i class="fas fa-check-circle"></i> 测试所有平台
+                                    </button>
                                 </div>
-                                <small class="text-muted">备份文件保存在: /app/config/</small>
+                                <small class="text-muted">Cookies文件保存在: /app/config/</small>
                             </div>
 
-                            <div id="backupsList">
+                            <div id="cookiesList">
                                 <div class="text-center text-muted">
-                                    <i class="fas fa-spinner fa-spin"></i> 加载备份列表...
+                                    <i class="fas fa-spinner fa-spin"></i> 加载Cookies列表...
                                 </div>
                             </div>
                         </div>
@@ -186,8 +232,8 @@
                         </div>
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-6">
-                                    <h6><i class="fas fa-chrome"></i> Chrome浏览器</h6>
+                                <div class="col-md-4">
+                                    <h6><i class="fab fa-youtube"></i> YouTube Cookies</h6>
                                     <ol>
                                         <li>安装扩展: "Get cookies.txt LOCALLY"</li>
                                         <li>访问并登录 <a href="https://youtube.com" target="_blank">YouTube</a></li>
@@ -196,14 +242,24 @@
                                         <li>复制JSON内容到导入框</li>
                                     </ol>
                                 </div>
-                                <div class="col-md-6">
-                                    <h6><i class="fas fa-firefox-browser"></i> Firefox浏览器</h6>
+                                <div class="col-md-4">
+                                    <h6><i class="fab fa-twitter"></i> Twitter/X Cookies</h6>
                                     <ol>
-                                        <li>安装扩展: "cookies.txt"</li>
-                                        <li>访问并登录 <a href="https://youtube.com" target="_blank">YouTube</a></li>
-                                        <li>右键点击页面 → "Export cookies"</li>
-                                        <li>保存为 cookies.txt</li>
-                                        <li>复制内容到导入框</li>
+                                        <li>安装扩展: "Get cookies.txt LOCALLY"</li>
+                                        <li>访问并登录 <a href="https://x.com" target="_blank">X (Twitter)</a></li>
+                                        <li>点击扩展图标</li>
+                                        <li>选择 "x.com"</li>
+                                        <li>复制JSON内容到导入框</li>
+                                    </ol>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6><i class="fas fa-globe"></i> 多平台智能管理</h6>
+                                    <ol>
+                                        <li>导入任意平台的cookies</li>
+                                        <li>系统按平台自动分离到独立文件</li>
+                                        <li>下载时根据URL智能选择对应文件</li>
+                                        <li>一次导入，支持所有平台</li>
+                                        <li>避免平台间cookies冲突</li>
                                     </ol>
                                 </div>
                             </div>
@@ -211,21 +267,25 @@
                             <div class="alert alert-warning mt-3">
                                 <h6><i class="fas fa-exclamation-triangle"></i> 重要提醒</h6>
                                 <ul class="mb-0">
+                                    <li>系统为每个平台生成独立cookies文件</li>
+                                    <li>下载时根据URL智能选择对应平台文件</li>
                                     <li>导入前会自动备份现有cookies</li>
                                     <li>支持格式自动检测和转换</li>
                                     <li>导入后会自动测试有效性</li>
                                     <li>建议每3个月更新一次</li>
-                                    <li>保持YouTube账号活跃状态</li>
+                                    <li>保持账号活跃状态（各平台）</li>
                                 </ul>
                             </div>
 
                             <div class="alert alert-info">
                                 <h6><i class="fas fa-shield-alt"></i> 安全说明</h6>
                                 <ul class="mb-0">
-                                    <li>Cookies仅用于YouTube视频下载</li>
+                                    <li>Cookies按平台分别存储在独立文件中</li>
                                     <li>不会存储您的密码信息</li>
                                     <li>您可以随时更新或删除cookies</li>
-                                    <li>建议使用专门的YouTube账号</li>
+                                    <li>建议使用专门的账号进行下载</li>
+                                    <li>智能选择对应平台cookies，避免冲突</li>
+                                    <li>便于单独管理和备份各平台cookies</li>
                                 </ul>
                             </div>
                         </div>
@@ -242,35 +302,71 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 页面加载时检查状态
     checkCookiesStatus();
-    loadBackupsList();
+    loadCookiesList();
 
     // 刷新状态按钮
     document.getElementById('refreshStatus').addEventListener('click', function() {
         checkCookiesStatus();
-        loadBackupsList();
+        loadCookiesList();
     });
 
-    // 测试cookies按钮
-    document.getElementById('testCookies').addEventListener('click', testCookiesValidity);
+
 
     // 导入相关按钮
-    document.getElementById('validateCookies').addEventListener('click', validateCookiesFormat);
     document.getElementById('importCookies').addEventListener('click', importCookies);
-    document.getElementById('clearContent').addEventListener('click', () => {
-        document.getElementById('cookiesContent').value = '';
-    });
-    document.getElementById('pasteExample').addEventListener('click', pasteExample);
 
-    // 备份相关按钮
-    document.getElementById('refreshBackups').addEventListener('click', loadBackupsList);
-    document.getElementById('refreshBackupsList').addEventListener('click', loadBackupsList);
+    // 绑定导入模式切换事件
+    document.querySelectorAll('input[name="importMode"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const platformSelection = document.getElementById('platformSelection');
+            if (this.value === 'raw') {
+                platformSelection.style.display = 'block';
+            } else {
+                platformSelection.style.display = 'none';
+            }
+        });
+    });
+
+    // Cookies管理相关按钮
+    document.getElementById('refreshPlatforms').addEventListener('click', loadCookiesList);
+    document.getElementById('refreshCookiesList').addEventListener('click', loadCookiesList);
+    document.getElementById('testAllCookies').addEventListener('click', testAllPlatformCookies);
+
+    // 快速操作按钮
+    document.getElementById('clearContent').addEventListener('click', function() {
+        document.getElementById('cookiesContent').value = '';
+        showInfo('已清空内容');
+    });
+
+    document.getElementById('pasteExample').addEventListener('click', function() {
+        const exampleContent = `[
+    {
+        "domain": ".youtube.com",
+        "name": "SID",
+        "value": "your_sid_value_here",
+        "path": "/",
+        "expires": 1735689600,
+        "httpOnly": false,
+        "secure": true
+    },
+    {
+        "domain": ".youtube.com",
+        "name": "HSID",
+        "value": "your_hsid_value_here",
+        "path": "/",
+        "expires": 1735689600,
+        "httpOnly": false,
+        "secure": true
+    }
+]`;
+        document.getElementById('cookiesContent').value = exampleContent;
+        showInfo('已粘贴示例内容，请替换为您的实际cookies');
+    });
 
     // 检查cookies状态
     function checkCookiesStatus() {
         fetch('/api/cookies/status', {
-            headers: {
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            }
+            credentials: 'same-origin'  // 使用cookies认证
         })
         .then(response => response.json())
         .then(data => {
@@ -318,103 +414,110 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         statusBadge.innerHTML = `<span class="badge ${badgeClass}">${statusMessage}</span>`;
-        statusText.textContent = status.message || '无详细信息';
-    }
 
-    // 测试cookies有效性
-    function testCookiesValidity() {
-        const btn = document.getElementById('testCookies');
-        const badge = document.getElementById('validityBadge');
+        // 构建状态文本，包含平台信息
+        let statusTextContent = status.message || '无详细信息';
 
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中';
-        badge.innerHTML = '<span class="badge bg-secondary">测试中...</span>';
-
-        fetch('/api/cookies/test', {
-            headers: {
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                if (data.valid) {
-                    badge.innerHTML = '<span class="badge bg-success">有效</span>';
-                    showSuccess('Cookies测试通过，可以正常下载YouTube视频');
-                } else {
-                    badge.innerHTML = '<span class="badge bg-danger">无效</span>';
-                    showError('Cookies测试失败: ' + (data.message || data.error));
-                }
-            } else {
-                badge.innerHTML = '<span class="badge bg-danger">错误</span>';
-                showError('测试失败: ' + data.error);
-            }
-        })
-        .catch(error => {
-            badge.innerHTML = '<span class="badge bg-danger">错误</span>';
-            showError('测试失败: ' + error.message);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-vial"></i> 测试';
-        });
-    }
-
-    // 验证cookies格式
-    function validateCookiesFormat() {
-        const content = document.getElementById('cookiesContent').value.trim();
-        if (!content) {
-            showError('请先输入cookies内容');
-            return;
+        // 添加平台信息
+        if (status.platform_analysis && Object.keys(status.platform_analysis).length > 0) {
+            const platforms = Object.keys(status.platform_analysis);
+            const platformBadges = platforms.map(platform => {
+                const analysis = status.platform_analysis[platform];
+                const badgeClass = analysis.has_auth ? 'bg-success' : 'bg-warning';
+                const icon = getPlatformIcon(platform);
+                const completeness = Math.round(analysis.completeness * 100);
+                return `<span class="badge ${badgeClass} me-1" title="${platform}: ${completeness}% 完整度">${icon} ${platform}</span>`;
+            }).join('');
+            statusTextContent += `<br><small>支持平台: ${platformBadges}</small>`;
         }
 
-        try {
-            // 尝试解析JSON
-            JSON.parse(content);
-            showSuccess('检测到有效的JSON格式');
-        } catch (e) {
-            // 检查Netscape格式
-            if (content.includes('# Netscape HTTP Cookie File') || 
-                (content.includes('\t') && content.includes('youtube.com'))) {
-                showSuccess('检测到Netscape格式');
-            } else {
-                showWarning('格式可能不正确，请检查内容');
-            }
-        }
+        statusText.innerHTML = statusTextContent;
     }
+
+    // 获取平台图标
+    function getPlatformIcon(platform) {
+        const icons = {
+            'youtube': '📺',
+            'twitter': '🐦',
+            'instagram': '📷',
+            'tiktok': '🎵',
+            'bilibili': '📺'
+        };
+        return icons[platform] || '🌐';
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // 导入cookies
     function importCookies() {
         const content = document.getElementById('cookiesContent').value.trim();
-        const format = document.getElementById('cookiesFormat').value;
 
         if (!content) {
             showError('请先输入cookies内容');
             return;
         }
 
+        // 获取导入模式
+        const importMode = document.querySelector('input[name="importMode"]:checked').value;
+        const platform = document.getElementById('targetPlatform').value;
+
         const btn = document.getElementById('importCookies');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 导入中';
+
+        // 根据模式显示不同的状态
+        let statusText = '';
+        switch(importMode) {
+            case 'raw':
+                statusText = `导入中 (原始模式 - ${platform})`;
+                break;
+            case 'preserve':
+                statusText = '导入中 (保持格式模式)';
+                break;
+            default:
+                statusText = '导入中 (标准模式)';
+        }
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${statusText}`;
 
         fetch('/api/cookies/import', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',  // 使用cookies认证
             body: JSON.stringify({
                 cookies_content: content,
-                format: format
+                format: 'auto',
+                import_mode: importMode,
+                platform: platform
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showSuccess('Cookies导入成功！找到 ' + data.found_cookies.length + ' 个重要cookies');
+                let message = `Cookies导入成功！(${data.import_mode || importMode}模式)`;
+                if (data.found_cookies && data.found_cookies.length > 0) {
+                    message += ` 找到 ${data.found_cookies.length} 个重要cookies`;
+                }
+                if (data.cookie_count) {
+                    message += ` 共 ${data.cookie_count} 行`;
+                }
+                showSuccess(message);
                 document.getElementById('cookiesContent').value = '';
                 checkCookiesStatus(); // 刷新状态
-                
+                loadCookiesList(); // 刷新列表
+
                 // 显示测试结果
                 if (data.test_result) {
                     if (data.test_result.valid) {
@@ -436,75 +539,75 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 粘贴示例
-    function pasteExample() {
-        const example = `[
-    {
-        "domain": ".youtube.com",
-        "name": "SID",
-        "value": "your_sid_value_here",
-        "path": "/",
-        "secure": false,
-        "expirationDate": 1767225600
-    },
-    {
-        "domain": ".youtube.com", 
-        "name": "HSID",
-        "value": "your_hsid_value_here",
-        "path": "/",
-        "secure": false,
-        "expirationDate": 1767225600
-    }
-]`;
-        document.getElementById('cookiesContent').value = example;
-        showInfo('已粘贴示例格式，请替换为您的实际cookies值');
-    }
 
-    // 加载备份列表
-    function loadBackupsList() {
-        fetch('/api/cookies/backup/list', {
-            headers: {
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
-            }
+
+    // 加载cookies列表
+    function loadCookiesList() {
+        fetch('/api/cookies/list', {
+            credentials: 'same-origin'  // 使用cookies认证
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                displayBackupsList(data.backups);
-                document.getElementById('backupCount').innerHTML = 
-                    `<span class="badge bg-success">${data.backups.length}</span>`;
+                displayCookiesList(data.cookies_files);
+                document.getElementById('platformCount').innerHTML =
+                    `<span class="badge bg-success">${data.cookies_files.length}</span>`;
             } else {
-                showError('加载备份列表失败: ' + data.error);
+                showError('加载Cookies列表失败: ' + data.error);
             }
         })
         .catch(error => {
-            showError('加载备份列表失败: ' + error.message);
+            showError('加载Cookies列表失败: ' + error.message);
         });
     }
 
-    // 显示备份列表
-    function displayBackupsList(backups) {
-        const container = document.getElementById('backupsList');
-        
-        if (backups.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted">暂无备份文件</div>';
+    // 显示cookies列表
+    function displayCookiesList(cookiesFiles) {
+        const container = document.getElementById('cookiesList');
+
+        if (cookiesFiles.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted">暂无导入的Cookies文件</div>';
             return;
         }
 
         let html = '<div class="table-responsive"><table class="table table-hover">';
-        html += '<thead><tr><th>文件名</th><th>创建时间</th><th>大小</th><th>操作</th></tr></thead><tbody>';
+        html += '<thead><tr><th>平台</th><th>修改时间</th><th>Cookies数量</th><th>状态</th><th>操作</th></tr></thead><tbody>';
 
-        backups.forEach(backup => {
-            const sizeKB = (backup.file_size / 1024).toFixed(1);
+        cookiesFiles.forEach(file => {
+            const statusBadge = file.has_auth ?
+                '<span class="badge bg-success">有认证</span>' :
+                '<span class="badge bg-warning">无认证</span>';
+
+            const expiredInfo = file.expired_cookies > 0 ?
+                `<small class="text-danger">(${file.expired_cookies}个已过期)</small>` : '';
+
             html += `
                 <tr>
-                    <td><code>${backup.filename}</code></td>
-                    <td>${backup.created_time_str}</td>
-                    <td>${sizeKB} KB</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-success" onclick="restoreBackup('${backup.filename}')">
-                            <i class="fas fa-undo"></i> 恢复
-                        </button>
+                        <strong>${file.platform}</strong><br>
+                        <small class="text-muted">${file.file_name}</small>
+                    </td>
+                    <td>${file.modified_date}</td>
+                    <td>
+                        ${file.cookies_count} 个
+                        ${expiredInfo}
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-sm btn-outline-info" onclick="inspectPlatformCookies('${file.platform}')" title="检查详情">
+                                <i class="fas fa-search"></i> 检查
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="testPlatformCookies('${file.platform}')" title="测试有效性">
+                                <i class="fas fa-check"></i> 测试
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="cleanPlatformCookies('${file.platform}')" title="清理过期cookies">
+                                <i class="fas fa-broom"></i> 清理
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deletePlatformCookies('${file.platform}')">
+                                <i class="fas fa-trash"></i> 删除
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -514,35 +617,242 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = html;
     }
 
-    // 恢复备份
-    window.restoreBackup = function(filename) {
-        if (!confirm(`确定要恢复备份 "${filename}" 吗？这将替换当前的cookies。`)) {
-            return;
-        }
 
-        fetch('/api/cookies/backup/restore', {
+
+
+
+    // 检查平台cookies
+    window.inspectPlatformCookies = function(platform) {
+        fetch('/api/cookies/inspect', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + localStorage.getItem('token')
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({
-                backup_filename: filename
+                platform: platform
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showSuccess('备份恢复成功: ' + data.message);
-                checkCookiesStatus(); // 刷新状态
+                showPlatformInspectionModal(data);
             } else {
-                showError('恢复失败: ' + data.error);
+                showError('检查失败: ' + data.error);
             }
         })
         .catch(error => {
-            showError('恢复失败: ' + error.message);
+            showError('检查失败: ' + error.message);
         });
     };
+
+    // 测试平台cookies
+    window.testPlatformCookies = function(platform) {
+        showInfo(`正在测试 ${platform} 平台cookies...`);
+
+        fetch('/api/cookies/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                platform: platform
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.valid) {
+                    showSuccess(`✅ ${platform} 平台cookies有效: ${data.message}`);
+                } else {
+                    showError(`❌ ${platform} 平台cookies无效: ${data.message || data.error}`);
+                }
+            } else {
+                showError(`❌ ${platform} 平台测试失败: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            showError(`❌ ${platform} 平台测试失败: ${error.message}`);
+        });
+    };
+
+    // 清理平台cookies
+    window.cleanPlatformCookies = function(platform) {
+        if (!confirm(`确定要清理 ${platform} 平台的过期cookies吗？\n\n这将删除过期cookies并修复会话cookies。`)) {
+            return;
+        }
+
+        fetch('/api/cookies/clean', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                platform: platform
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(`✅ ${platform} 平台cookies清理成功`);
+                loadCookiesList(); // 刷新列表
+                checkCookiesStatus(); // 刷新状态
+            } else {
+                showError('清理失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('清理失败: ' + error.message);
+        });
+    };
+
+    // 删除平台cookies
+    window.deletePlatformCookies = function(platform) {
+        if (!confirm(`确定要删除 ${platform} 平台的cookies文件吗？\n\n此操作不可恢复！`)) {
+            return;
+        }
+
+        fetch('/api/cookies/delete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                platform: platform
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(`✅ ${platform} 平台cookies已删除`);
+                loadCookiesList(); // 刷新列表
+                checkCookiesStatus(); // 刷新状态
+            } else {
+                showError('删除失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('删除失败: ' + error.message);
+        });
+    };
+
+    // 测试所有平台cookies
+    function testAllPlatformCookies() {
+        showInfo('正在测试所有平台cookies...');
+
+        fetch('/api/cookies/test', {
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let message = '🧪 所有平台测试完成:\n\n';
+
+                if (data.platform_results) {
+                    Object.entries(data.platform_results).forEach(([platform, result]) => {
+                        const status = result.valid ? '✅' : '❌';
+                        message += `${status} ${platform}: ${result.message}\n`;
+                    });
+                } else {
+                    message += data.valid ? '✅ 测试通过' : '❌ 测试失败';
+                    message += `\n消息: ${data.message}`;
+                }
+
+                showInfo(message);
+            } else {
+                showError('测试失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            showError('测试失败: ' + error.message);
+        });
+    }
+
+    // 显示平台检查结果
+    function showPlatformInspectionModal(data) {
+        let inspectionInfo = `🔍 **${data.platform} 平台Cookies检查报告**\n\n`;
+
+        inspectionInfo += `📁 **文件信息:**\n`;
+        inspectionInfo += `- 平台: ${data.platform}\n`;
+        inspectionInfo += `- 文件大小: ${(data.file_size / 1024).toFixed(1)} KB\n`;
+        inspectionInfo += `- 总行数: ${data.total_lines}\n`;
+        inspectionInfo += `- 有效行数: ${data.valid_lines}\n`;
+
+        if (data.analysis) {
+            inspectionInfo += `\n📊 **Cookies分析:**\n`;
+            inspectionInfo += `- 总数量: ${data.analysis.total_cookies}\n`;
+            inspectionInfo += `- 有效: ${data.analysis.valid_cookies}\n`;
+            inspectionInfo += `- 过期: ${data.analysis.expired_cookies}\n`;
+            inspectionInfo += `- 状态: ${data.analysis.overall_status}\n`;
+        }
+
+        if (data.cookies_details && data.cookies_details.length > 0) {
+            inspectionInfo += `\n🍪 **重要Cookies详情:**\n`;
+            data.cookies_details.slice(0, 10).forEach(cookie => {
+                const status = cookie.is_expired ? '❌' : '✅';
+                const important = cookie.is_important ? '⭐' : '';
+                inspectionInfo += `${status}${important} ${cookie.name}: ${cookie.domain}\n`;
+            });
+
+            if (data.cookies_details.length > 10) {
+                inspectionInfo += `... 还有 ${data.cookies_details.length - 10} 个cookies\n`;
+            }
+        }
+
+        // 创建检查结果模态框
+        const modalHtml = `
+            <div class="modal fade" id="platformInspectionModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">🔍 ${data.platform} 平台Cookies检查</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <pre style="white-space: pre-wrap; font-family: monospace; background: #f8f9fa; padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto;">${inspectionInfo}</pre>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                            <button type="button" class="btn btn-success" onclick="testPlatformCookies('${data.platform}')">测试此平台</button>
+                            <button type="button" class="btn btn-primary" onclick="copyPlatformInspectionInfo()">复制报告</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 移除旧的模态框
+        const oldModal = document.getElementById('platformInspectionModal');
+        if (oldModal) {
+            oldModal.remove();
+        }
+
+        // 添加新的模态框
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('platformInspectionModal'));
+        modal.show();
+
+        // 存储检查信息供复制使用
+        window.currentPlatformInspectionInfo = inspectionInfo;
+    }
+
+    // 复制平台检查信息
+    window.copyPlatformInspectionInfo = function() {
+        if (window.currentPlatformInspectionInfo) {
+            navigator.clipboard.writeText(window.currentPlatformInspectionInfo).then(() => {
+                showSuccess('检查报告已复制到剪贴板');
+            }).catch(() => {
+                showWarning('复制失败，请手动选择文本复制');
+            });
+        }
+    };
+
+
 
     // 消息显示函数
     function showSuccess(message) {

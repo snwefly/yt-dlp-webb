@@ -3,8 +3,8 @@
 主要页面路由
 """
 
-from flask import Blueprint, render_template, jsonify, request
-from ..auth import login_required
+from flask import Blueprint, render_template, jsonify, request, current_app
+from flask_login import login_required, current_user
 import logging
 import os
 
@@ -13,103 +13,66 @@ main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
-    """主网页界面"""
-    # 不强制要求登录，但会传递认证状态给模板
-    from flask import session
-    from ..auth import auth_manager
+    """主网页界面 - 公开访问，前端处理认证状态"""
+    is_authenticated = current_user.is_authenticated
+    user_data = current_user.username if is_authenticated else None
+    is_admin = current_user.is_admin if is_authenticated else False
 
-    # 检查session中的认证状态
-    current_user = None
-    is_authenticated = False
+    logger.info(f"访问主页 - 用户: {user_data}, 管理员: {is_admin}")
+    return render_template('index.html',
+                         is_authenticated=is_authenticated,
+                         current_user=user_data,
+                         is_admin=is_admin)
 
-    if 'auth_token' in session:
-        token = session['auth_token']
-        if auth_manager.verify_session(token):
-            current_user = auth_manager.get_session_user(token)
-            is_authenticated = True
-            logger.info(f"访问主页 - 用户已通过session认证: {current_user}")
-        else:
-            # 清除无效的session
-            session.pop('auth_token', None)
-            logger.info("访问主页 - session中的token无效，已清除")
-    else:
-        logger.info("访问主页 - 未找到session认证信息")
-
-    logger.info(f"访问主页 - 最终认证状态: {is_authenticated}, 用户: {current_user}")
-    return render_template('index.html', is_authenticated=is_authenticated, current_user=current_user)
+@main_bp.route('/welcome')
+def welcome():
+    """公开的欢迎页面，引导用户登录"""
+    return render_template('welcome.html')
 
 @main_bp.route('/shortcuts-help')
-@login_required
 def shortcuts_help():
-    """iOS快捷指令使用指南"""
-    from ..auth import get_current_user
+    """iOS快捷指令使用指南 - 公开访问，前端处理认证状态"""
+    is_authenticated = current_user.is_authenticated
+    user_data = current_user.username if is_authenticated else None
+    is_admin = current_user.is_admin if is_authenticated else False
 
-    current_user = get_current_user()
-    is_authenticated = current_user is not None
-
-    return render_template('shortcuts_help.html', is_authenticated=is_authenticated, current_user=current_user)
+    return render_template('shortcuts_help.html',
+                         is_authenticated=is_authenticated,
+                         current_user=user_data,
+                         is_admin=is_admin)
 
 @main_bp.route('/files')
-@login_required
 def files():
-    """文件管理页面"""
-    from ..auth import get_current_user
+    """文件管理页面 - 公开访问，前端处理认证状态"""
+    is_authenticated = current_user.is_authenticated
+    user_data = current_user.username if is_authenticated else None
+    is_admin = current_user.is_admin if is_authenticated else False
 
-    current_user = get_current_user()
-    is_authenticated = current_user is not None
+    return render_template('files.html',
+                         is_authenticated=is_authenticated,
+                         current_user=user_data,
+                         is_admin=is_admin)
 
-    return render_template('files.html', is_authenticated=is_authenticated, current_user=current_user)
+@main_bp.route('/video-player')
+def video_player():
+    """视频播放器页面 - 独立页面，避免CSS冲突"""
+    # 获取URL参数
+    video_url = request.args.get('url')
+    filename = request.args.get('filename', '未知视频')
+
+    if not video_url:
+        logger.warning("视频播放器访问缺少URL参数")
+        return "缺少视频URL参数", 400
+
+    logger.info(f"打开视频播放器 - 文件: {filename}")
+
+    return render_template('video_player.html')
 
 
 
-@main_bp.route('/debug')
-def debug():
-    """认证调试页面"""
-    from flask import session
-    from ..auth import auth_manager
+# 调试功能已移除 - 使用Flask-Login后不再需要复杂的session调试
 
-    # 收集调试信息
-    debug_info = {
-        'session_data': dict(session),
-        'session_has_auth_token': 'auth_token' in session,
-        'session_auth_token': session.get('auth_token', 'None')[:20] + '...' if session.get('auth_token') else 'None',
-        'session_permanent': session.permanent,
-        'request_headers': dict(request.headers),
-        'auth_manager_sessions': len(auth_manager.active_sessions),
-        'sessions_file_exists': os.path.exists(auth_manager.sessions_file),
-        'sessions_file_path': auth_manager.sessions_file
-    }
-
-    # 检查session token有效性
-    if 'auth_token' in session:
-        token = session['auth_token']
-        debug_info['session_token_valid'] = auth_manager.verify_session(token)
-        debug_info['session_token_user'] = auth_manager.get_session_user(token) if auth_manager.verify_session(token) else 'None'
-    else:
-        debug_info['session_token_valid'] = False
-        debug_info['session_token_user'] = 'None'
-
-    return render_template('debug_auth.html', debug_info=debug_info)
-
-@main_bp.route('/test-auth')
-def test_auth():
-    """简单的认证测试端点"""
-    from flask import session
-    from ..auth import auth_manager
-
-    result = {
-        'timestamp': __import__('time').time(),
-        'flask_session_has_token': 'auth_token' in session,
-        'active_sessions_count': len(auth_manager.active_sessions),
-        'sessions_file_exists': os.path.exists(auth_manager.sessions_file)
-    }
-
-    if 'auth_token' in session:
-        token = session['auth_token']
-        result['token_valid'] = auth_manager.verify_session(token)
-        result['token_user'] = auth_manager.get_session_user(token)
-
-    return jsonify(result)
+# 测试路由已移除
 
 @main_bp.route('/health')
 def health_check():
@@ -162,40 +125,147 @@ def health_check():
             'error': str(e)
         }), 500
 
-@main_bp.route('/auth-test')
-def auth_test():
-    """认证状态测试页面"""
-    from ..auth import get_current_user
+# 测试路由已删除
 
-    current_user = get_current_user()
-    is_authenticated = current_user is not None
+@main_bp.route('/debug-db')
+def debug_db():
+    """数据库调试信息"""
+    try:
+        from ..models import db, User
 
-    return render_template('auth_test.html', is_authenticated=is_authenticated, current_user=current_user)
+        # 检查数据库连接
+        db_info = {
+            'database_uri': current_app.config.get('SQLALCHEMY_DATABASE_URI'),
+            'tables': [],
+            'users': []
+        }
 
-@main_bp.route('/admin-check')
-def admin_check():
-    """检查管理员权限状态"""
-    from flask import session
-    from ..auth import auth_manager
+        # 检查表是否存在
+        try:
+            inspector = db.inspect(db.engine)
+            db_info['tables'] = inspector.get_table_names()
+        except Exception as e:
+            db_info['table_error'] = str(e)
 
-    result = {
-        'timestamp': __import__('time').time(),
-        'session_has_token': 'auth_token' in session,
-        'admin_username': auth_manager.admin_username,
-        'current_user': None,
-        'is_admin': False,
-        'token_valid': False
-    }
+        # 检查用户
+        try:
+            users = User.query.all()
+            for user in users:
+                db_info['users'].append({
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'is_admin': user.is_admin,
+                    'created_at': user.created_at.isoformat() if user.created_at else None
+                })
+        except Exception as e:
+            db_info['users_error'] = str(e)
 
-    if 'auth_token' in session:
-        token = session['auth_token']
-        result['token_valid'] = auth_manager.verify_session(token)
-        if result['token_valid']:
-            current_user = auth_manager.get_session_user(token)
-            result['current_user'] = current_user
-            result['is_admin'] = (current_user == auth_manager.admin_username)
+        return jsonify(db_info)
 
-    return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/init-db')
+def init_db():
+    """强制初始化数据库"""
+    try:
+        from ..models import db, User
+
+        # 创建所有表
+        db.create_all()
+
+        # 检查是否已有管理员用户
+        admin_user = User.query.filter_by(username='admin').first()
+        if not admin_user:
+            # 创建管理员用户
+            admin_user = User(
+                username='admin',
+                email='admin@example.com',
+                is_admin=True
+            )
+            admin_user.set_password('admin123')
+            db.session.add(admin_user)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': '数据库初始化成功，管理员用户已创建',
+                'admin_user': {
+                    'username': admin_user.username,
+                    'email': admin_user.email,
+                    'is_admin': admin_user.is_admin
+                }
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'message': '数据库已存在，管理员用户已存在',
+                'admin_user': {
+                    'username': admin_user.username,
+                    'email': admin_user.email,
+                    'is_admin': admin_user.is_admin
+                }
+            })
+
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@main_bp.route('/migrate-telegram-api')
+def migrate_telegram_api():
+    """迁移 Telegram API 字段"""
+    try:
+        from ..models import db
+
+        # 检查当前表结构
+        with db.engine.connect() as conn:
+            # 检查字段是否已存在
+            from sqlalchemy import text
+            result = conn.execute(text("PRAGMA table_info(telegram_config)"))
+            columns = [row[1] for row in result.fetchall()]
+
+            messages = []
+
+            # 添加 api_id 字段
+            if 'api_id' not in columns:
+                conn.execute(text("ALTER TABLE telegram_config ADD COLUMN api_id VARCHAR(20)"))
+                messages.append("✅ 添加 api_id 字段成功")
+            else:
+                messages.append("ℹ️ api_id 字段已存在")
+
+            # 添加 api_hash 字段
+            if 'api_hash' not in columns:
+                conn.execute(text("ALTER TABLE telegram_config ADD COLUMN api_hash VARCHAR(50)"))
+                messages.append("✅ 添加 api_hash 字段成功")
+            else:
+                messages.append("ℹ️ api_hash 字段已存在")
+
+            # 提交更改
+            conn.commit()
+
+            # 验证字段
+            result = conn.execute(text("PRAGMA table_info(telegram_config)"))
+            new_columns = [row[1] for row in result.fetchall()]
+
+            return jsonify({
+                'success': True,
+                'message': '数据库迁移完成',
+                'details': messages,
+                'columns_before': columns,
+                'columns_after': new_columns
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 

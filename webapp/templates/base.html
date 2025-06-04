@@ -8,6 +8,7 @@
     <!-- 认证状态元数据 -->
     <meta name="auth-status" content="{{ 'true' if is_authenticated else 'false' }}">
     <meta name="current-user" content="{{ current_user or '' }}">
+    <meta name="is-admin" content="{{ 'true' if is_admin else 'false' }}">
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -184,9 +185,19 @@
                             <i class="fas fa-home me-1"></i>首页
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/shortcuts-help" id="nav-shortcuts">
+                            <i class="fas fa-mobile-alt me-1"></i>快捷指令
+                        </a>
+                    </li>
                     <li class="nav-item" id="nav-files-item" style="display: none;">
                         <a class="nav-link" href="#" id="nav-files" onclick="navigateToFiles(); return false;">
                             <i class="fas fa-folder me-1"></i>文件管理
+                        </a>
+                    </li>
+                    <li class="nav-item" id="nav-telegram-item" style="display: none;">
+                        <a class="nav-link" href="#" id="nav-telegram" onclick="navigateToTelegram(); return false;">
+                            <i class="fab fa-telegram me-1"></i>Telegram
                         </a>
                     </li>
                     <li class="nav-item" id="nav-admin-item" style="display: none;">
@@ -215,6 +226,15 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Axios -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script>
+        // 配置axios默认设置，确保发送session cookie
+        axios.defaults.withCredentials = true;
+        // 设置默认Content-Type为JSON
+        axios.defaults.headers.post['Content-Type'] = 'application/json';
+        axios.defaults.headers.put['Content-Type'] = 'application/json';
+        axios.defaults.headers.patch['Content-Type'] = 'application/json';
+    </script>
 
     <script>
         // 全局工具函数
@@ -271,91 +291,56 @@
 
             if (authMeta) {
                 isAuthenticated = authMeta.content === 'true';
+                console.log('📋 从元数据获取认证状态:', isAuthenticated);
             }
             if (userMeta && userMeta.content) {
                 currentUser = userMeta.content;
+                console.log('👤 从元数据获取用户:', currentUser);
             }
         } catch (e) {
-            console.log('无法从元数据获取认证状态，使用默认值');
+            console.log('⚠️ 无法从元数据获取认证状态，使用默认值');
         }
 
-        // 获取有效的认证token
-        function getAuthToken() {
-            const token = localStorage.getItem('auth_token');
-            return token;
-        }
-
-        // 检查认证状态
+        // 检查认证状态 - 使用Flask-Login
         function isUserAuthenticated() {
-            const token = getAuthToken();
-            const authenticated = (token && token.length > 0) || isAuthenticated;
-            return authenticated;
-        }
-
-        // 验证token有效性
-        async function validateToken() {
-            const token = getAuthToken();
-            if (!token) {
-                return false;
-            }
-
-            try {
-                const response = await axios.get('/api/auth/verify', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.data.valid) {
-                    return true;
-                } else {
-                    localStorage.removeItem('auth_token');
-                    return false;
-                }
-            } catch (error) {
-                localStorage.removeItem('auth_token');
-                return false;
-            }
+            // 直接使用服务器端传递的认证状态
+            return isAuthenticated && currentUser;
         }
 
         // 初始化导航栏
         async function initializeNavigation() {
             try {
-                // 检查认证状态
-                if (!isUserAuthenticated()) {
-                    showGuestNavigation();
+                console.log('🔄 初始化导航栏，认证状态:', isAuthenticated, '用户:', currentUser);
+
+                // 如果服务器端已认证，直接显示用户导航
+                if (isAuthenticated && currentUser) {
+                    console.log('✅ 服务器端已认证，显示用户导航');
+
+                    // 检查是否为管理员（从元数据获取）
+                    let isAdmin = false;
+                    try {
+                        const adminMeta = document.querySelector('meta[name="is-admin"]');
+                        if (adminMeta) {
+                            isAdmin = adminMeta.content === 'true';
+                        } else {
+                            // 回退到用户名检查
+                            isAdmin = currentUser === 'admin';
+                        }
+                    } catch (e) {
+                        // 回退到用户名检查
+                        isAdmin = currentUser === 'admin';
+                    }
+
+                    console.log('👤 用户:', currentUser, '管理员:', isAdmin);
+                    showUserNavigation(currentUser, isAdmin);
+                    setActiveNavItem();
                     return;
                 }
 
-                const token = getAuthToken();
-                if (!token) {
-                    showGuestNavigation();
-                    return;
-                }
+                // 使用Flask-Login的认证状态，不需要token检查
 
-                // 验证token并获取用户信息
-                const response = await fetch('/api/auth/verify', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.valid) {
-                        // 更新全局认证状态
-                        isAuthenticated = true;
-                        currentUser = data.username;
-                        showUserNavigation(data.username, data.is_admin);
-                        setActiveNavItem();
-                        return;
-                    }
-                }
-
-                // token无效，清除并显示访客导航
-                localStorage.removeItem('auth_token');
-                isAuthenticated = false;
-                currentUser = null;
+                // 显示访客导航
+                console.log('👤 显示访客导航');
                 showGuestNavigation();
 
             } catch (error) {
@@ -368,6 +353,9 @@
         function showUserNavigation(username, isAdmin) {
             // 显示文件管理
             document.getElementById('nav-files-item').style.display = 'block';
+
+            // 显示Telegram菜单（所有登录用户）
+            document.getElementById('nav-telegram-item').style.display = 'block';
 
             // 显示管理菜单（仅管理员）
             if (isAdmin) {
@@ -382,10 +370,14 @@
                         <i class="fas fa-user me-1"></i>${username}
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="/shortcuts-help">
+                            <i class="fas fa-mobile-alt me-2"></i>快捷指令
+                        </a></li>
                         <li><a class="dropdown-item" href="#" onclick="navigateToFiles(); return false;">
                             <i class="fas fa-folder me-2"></i>文件管理
                         </a></li>
                         ${isAdmin ? '<li><a class="dropdown-item" href="#" onclick="navigateToAdmin(); return false;"><i class="fas fa-cog me-2"></i>管理</a></li>' : ''}
+                        ${isAdmin ? '<li><a class="dropdown-item" href="/admin/telegram-settings"><i class="fab fa-telegram me-2"></i>Telegram设置</a></li>' : ''}
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" onclick="logout()">
                             <i class="fas fa-sign-out-alt me-2"></i>退出
@@ -397,9 +389,10 @@
 
         // 显示访客导航
         function showGuestNavigation() {
-            // 隐藏需要认证的菜单
-            document.getElementById('nav-files-item').style.display = 'none';
-            document.getElementById('nav-admin-item').style.display = 'none';
+            // 显示所有菜单项，但功能受限
+            document.getElementById('nav-files-item').style.display = 'block';
+            document.getElementById('nav-telegram-item').style.display = 'none'; // Telegram功能需要登录
+            document.getElementById('nav-admin-item').style.display = 'none'; // 管理功能仍需要权限
 
             // 设置访客信息
             const userNav = document.getElementById('user-nav');
@@ -419,54 +412,35 @@
 
             navItems.forEach(item => {
                 item.classList.remove('active');
-                if (item.getAttribute('href') === currentPath) {
+                const href = item.getAttribute('href');
+                if (href === currentPath) {
+                    item.classList.add('active');
+                }
+                // 特殊处理快捷指令页面
+                if (currentPath === '/shortcuts-help' && href === '/shortcuts-help') {
                     item.classList.add('active');
                 }
             });
         }
 
-        // 退出登录
-        function logout() {
-            localStorage.removeItem('auth_token');
+        // 退出登录 - 使用Flask-Login
+        async function logout() {
+            try {
+                await fetch('/logout', {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            }
             window.location.href = '/login';
         }
 
-        // 通用的认证页面导航函数
+        // 简化的页面导航函数 - 使用Flask-Login
         async function navigateWithAuth(targetUrl, pageName = '页面') {
-            const token = getAuthToken();
-            if (!token) {
-                console.log(`❌ 无认证token，重定向到登录页 - ${pageName}`);
-                window.location.href = '/login';
-                return;
-            }
-
-            try {
-                console.log(`🔄 同步session到后端 - ${pageName}...`);
-                // 先同步session
-                const response = await fetch('/api/auth/sync-session', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    console.log(`✅ Session同步成功，导航到${pageName}`);
-                    window.location.href = targetUrl;
-                } else if (response.status === 401) {
-                    console.log(`❌ Token无效，重定向到登录页 - ${pageName}`);
-                    localStorage.removeItem('auth_token');
-                    window.location.href = '/login';
-                } else {
-                    console.log(`⚠️ Session同步失败，尝试直接导航到${pageName}`);
-                    window.location.href = targetUrl;
-                }
-            } catch (error) {
-                console.error(`Session同步请求失败 - ${pageName}:`, error);
-                // 网络错误时，直接尝试导航
-                window.location.href = targetUrl;
-            }
+            console.log(`🔄 导航到${pageName}`);
+            // Flask-Login会自动处理认证，直接导航
+            window.location.href = targetUrl;
         }
 
         // 导航到管理页面
@@ -476,7 +450,19 @@
 
         // 导航到文件管理页面
         async function navigateToFiles() {
-            await navigateWithAuth('/files', '文件管理页面');
+            console.log('🎯 导航到文件管理页面');
+            // 直接导航，不需要认证检查
+            window.location.href = '/files';
+        }
+
+        // 导航到cookies管理页面
+        async function navigateToCookiesManager() {
+            await navigateWithAuth('/admin/cookies-manager', 'Cookies管理页面');
+        }
+
+        // 导航到Telegram页面
+        async function navigateToTelegram() {
+            await navigateWithAuth('/telegram', 'Telegram页面');
         }
 
 
@@ -486,38 +472,26 @@
             initializeNavigation();
         };
 
-        // 全局函数：确保认证状态同步
+        // 全局函数：检查认证状态 - 使用Flask-Login
         window.ensureAuthSync = async function() {
-            const token = getAuthToken();
-            if (!token) {
-                console.log('❌ 无token，无需同步');
-                return false;
-            }
-
             try {
-                console.log('🔄 确保认证状态同步...');
-                const response = await fetch('/api/auth/sync-session', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
+                console.log('🔄 检查认证状态...');
+                const response = await fetch('/status', {
+                    method: 'GET',
+                    credentials: 'same-origin'  // 包含cookies
                 });
 
                 if (response.ok) {
-                    console.log('✅ 认证状态同步成功');
-                    return true;
-                } else if (response.status === 401) {
-                    console.log('❌ Token无效，清理本地状态');
-                    localStorage.removeItem('auth_token');
-                    return false;
+                    const data = await response.json();
+                    console.log('✅ 认证状态检查成功:', data.authenticated ? data.username : '未登录');
+                    return data.authenticated;
                 } else {
-                    console.warn('⚠️ 认证状态同步失败，但token可能仍有效');
-                    return true; // 假设token仍有效
+                    console.log('❌ 认证状态检查失败');
+                    return false;
                 }
             } catch (error) {
-                console.error('认证状态同步请求失败:', error);
-                return true; // 网络错误时假设token仍有效
+                console.error('🔄 认证状态检查请求失败:', error);
+                return false;
             }
         };
 
