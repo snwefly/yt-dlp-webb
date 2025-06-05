@@ -342,5 +342,5 @@ if __name__ == '__main__':
     app = create_app()
     app.run(host='0.0.0.0', port=8080, debug=False)
 else:
-    # 为 gunicorn 提供应用实例
-    app = create_app()
+    # 延迟创建应用实例，避免导入时的副作用
+    app = None

@@ -198,7 +198,30 @@ install_runtime_dependencies() {
     # 安装缺失的依赖
     if [ ${#deps_to_install[@]} -gt 0 ]; then
         log_info "安装缺失的依赖: ${deps_to_install[*]}"
-        pip install --no-cache-dir "${deps_to_install[@]}" || log_warning "部分依赖安装失败，继续启动"
+
+        # 先尝试批量安装
+        if pip install --no-cache-dir "${deps_to_install[@]}" 2>/dev/null; then
+            log_success "批量安装成功"
+        else
+            log_warning "批量安装失败，尝试逐个安装..."
+
+            # 逐个安装关键依赖
+            for dep in "${deps_to_install[@]}"; do
+                if pip install --no-cache-dir "$dep" 2>/dev/null; then
+                    log_success "安装成功: $dep"
+                else
+                    log_warning "安装失败: $dep"
+                fi
+            done
+        fi
+
+        # 再次验证关键依赖
+        if python -c "import flask_login" 2>/dev/null; then
+            log_success "Flask-Login 验证通过"
+        else
+            log_error "Flask-Login 仍然缺失，尝试强制安装..."
+            pip install --no-cache-dir --force-reinstall Flask-Login>=0.6.3 || log_error "Flask-Login 安装失败"
+        fi
     else
         log_success "所有必需依赖已安装"
     fi
@@ -251,11 +274,36 @@ log_info "🔍 验证 webapp 模块..."
 python -c "
 import sys
 sys.path.insert(0, '/app')
+
+# 首先检查关键依赖
+print('检查关键依赖...')
+try:
+    import flask_login
+    print('✅ flask_login 可用')
+except ImportError as e:
+    print(f'❌ flask_login 导入失败: {e}')
+    sys.exit(1)
+
+try:
+    import flask
+    print('✅ flask 可用')
+except ImportError as e:
+    print(f'❌ flask 导入失败: {e}')
+    sys.exit(1)
+
+# 然后检查 webapp 模块
 try:
     from webapp.app import create_app
     print('✅ webapp 模块导入成功')
+
+    # 尝试创建应用实例
+    app = create_app()
+    print('✅ Flask 应用创建成功')
+
 except Exception as e:
-    print(f'❌ webapp 模块导入失败: {e}')
+    print(f'❌ webapp 模块测试失败: {e}')
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 "
 
@@ -263,7 +311,18 @@ if [ $? -eq 0 ]; then
     log_success "webapp 模块验证通过"
 else
     log_error "webapp 模块验证失败"
-    exit 1
+
+    # 如果验证失败，尝试最后的修复
+    log_warning "尝试最后的依赖修复..."
+    pip install --no-cache-dir --force-reinstall Flask-Login>=0.6.3 Flask>=3.1.1
+
+    # 再次验证
+    if python -c "import flask_login; from webapp.app import create_app; print('修复成功')" 2>/dev/null; then
+        log_success "依赖修复成功，继续启动"
+    else
+        log_error "依赖修复失败，无法启动"
+        exit 1
+    fi
 fi
 
 # 启动 Web 应用

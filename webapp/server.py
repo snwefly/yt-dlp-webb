@@ -23,11 +23,18 @@ class WebServer:
 
     def create_app(self):
         """创建带配置的 Flask 应用程序"""
-        config = {
+        # 设置环境变量来配置应用
+        import os
+        os.environ['DOWNLOAD_FOLDER'] = self.download_folder
+
+        self.app = create_app()
+
+        # 更新应用配置
+        self.app.config.update({
             'DOWNLOAD_FOLDER': self.download_folder,
             'DEBUG': self.debug,
-        }
-        self.app = create_app(config)
+        })
+
         return self.app
 
     def start(self, open_browser=True):
