@@ -113,6 +113,47 @@ echo "📦 检查和安装运行时依赖..."
 install_runtime_dependencies() {
     local deps_to_install=()
 
+    # 检查 Flask 核心依赖（最重要的）
+    if ! python -c "import flask" 2>/dev/null; then
+        echo "⚠️ Flask 未安装，添加到安装列表"
+        deps_to_install+=("Flask>=3.1.1")
+    fi
+
+    if ! python -c "import flask_login" 2>/dev/null; then
+        echo "⚠️ Flask-Login 未安装，添加到安装列表"
+        deps_to_install+=("Flask-Login>=0.6.3")
+    fi
+
+    if ! python -c "import flask_sqlalchemy" 2>/dev/null; then
+        echo "⚠️ Flask-SQLAlchemy 未安装，添加到安装列表"
+        deps_to_install+=("Flask-SQLAlchemy>=3.1.1")
+    fi
+
+    if ! python -c "import flask_cors" 2>/dev/null; then
+        echo "⚠️ flask-cors 未安装，添加到安装列表"
+        deps_to_install+=("flask-cors>=6.0.0")
+    fi
+
+    if ! python -c "import werkzeug" 2>/dev/null; then
+        echo "⚠️ Werkzeug 未安装，添加到安装列表"
+        deps_to_install+=("Werkzeug>=3.1.3")
+    fi
+
+    if ! python -c "import jwt" 2>/dev/null; then
+        echo "⚠️ PyJWT 未安装，添加到安装列表"
+        deps_to_install+=("PyJWT>=2.8.0")
+    fi
+
+    if ! python -c "import requests" 2>/dev/null; then
+        echo "⚠️ requests 未安装，添加到安装列表"
+        deps_to_install+=("requests>=2.32.3")
+    fi
+
+    if ! python -c "import gunicorn" 2>/dev/null; then
+        echo "⚠️ gunicorn 未安装，添加到安装列表"
+        deps_to_install+=("gunicorn>=23.0.0")
+    fi
+
     # 检查 Telegram 相关依赖
     if ! python -c "import pyrogram" 2>/dev/null; then
         echo "⚠️ pyrogram 未安装，添加到安装列表"

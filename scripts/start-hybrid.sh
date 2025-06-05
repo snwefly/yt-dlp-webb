@@ -107,7 +107,7 @@ log_info "📦 检查和安装运行时依赖..."
 install_runtime_dependencies() {
     local deps_to_install=()
 
-    # 检查 Flask 核心依赖
+    # 检查 Flask 核心依赖（最重要的）
     if ! python -c "import flask" 2>/dev/null; then
         log_warning "Flask 未安装，添加到安装列表"
         deps_to_install+=("Flask>=3.1.1")
@@ -133,6 +133,11 @@ install_runtime_dependencies() {
         deps_to_install+=("Werkzeug>=3.1.3")
     fi
 
+    if ! python -c "import jwt" 2>/dev/null; then
+        log_warning "PyJWT 未安装，添加到安装列表"
+        deps_to_install+=("PyJWT>=2.8.0")
+    fi
+
     if ! python -c "import requests" 2>/dev/null; then
         log_warning "requests 未安装，添加到安装列表"
         deps_to_install+=("requests>=2.32.3")
@@ -152,12 +157,6 @@ install_runtime_dependencies() {
     if ! python -c "import filetype" 2>/dev/null; then
         log_warning "filetype 未安装，添加到安装列表"
         deps_to_install+=("filetype>=1.2.0")
-    fi
-
-    # 检查 JWT 依赖
-    if ! python -c "import jwt" 2>/dev/null; then
-        log_warning "PyJWT 未安装，添加到安装列表"
-        deps_to_install+=("PyJWT>=2.8.0")
     fi
 
     # 检查 yt-dlp 核心依赖
@@ -247,46 +246,6 @@ fi
 
 
 
-# 详细检查Python环境和依赖
-log_info "🔍 详细检查Python环境..."
-python -c "
-import sys
-print(f'Python版本: {sys.version}')
-print(f'Python路径: {sys.executable}')
-print(f'sys.path: {sys.path[:3]}...')  # 只显示前3个路径
-"
-
-log_info "🔍 逐步检查关键依赖..."
-python -c "
-import sys
-sys.path.insert(0, '/app')
-
-# 检查每个关键依赖
-dependencies = [
-    'flask',
-    'flask_login',
-    'flask_sqlalchemy',
-    'flask_cors',
-    'werkzeug',
-    'requests',
-    'gunicorn',
-    'jwt'
-]
-
-for dep in dependencies:
-    try:
-        __import__(dep)
-        print(f'✅ {dep} 可用')
-    except ImportError as e:
-        print(f'❌ {dep} 不可用: {e}')
-        sys.exit(1)
-"
-
-if [ $? -ne 0 ]; then
-    log_error "关键依赖检查失败"
-    exit 1
-fi
-
 # 验证 webapp 模块
 log_info "🔍 验证 webapp 模块..."
 python -c "
@@ -297,8 +256,6 @@ try:
     print('✅ webapp 模块导入成功')
 except Exception as e:
     print(f'❌ webapp 模块导入失败: {e}')
-    import traceback
-    traceback.print_exc()
     sys.exit(1)
 "
 
