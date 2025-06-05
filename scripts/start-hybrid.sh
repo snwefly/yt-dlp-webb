@@ -325,6 +325,56 @@ else
     fi
 fi
 
+# 最终依赖检查和修复
+log_info "🔧 最终依赖检查..."
+python -c "
+import sys
+import subprocess
+
+# 检查关键依赖
+missing_deps = []
+try:
+    import flask_login
+    print('✅ flask_login 可用')
+except ImportError:
+    print('❌ flask_login 缺失')
+    missing_deps.append('Flask-Login>=0.6.3')
+
+try:
+    import flask
+    print('✅ flask 可用')
+except ImportError:
+    print('❌ flask 缺失')
+    missing_deps.append('Flask>=3.1.1')
+
+# 如果有缺失依赖，立即安装
+if missing_deps:
+    print(f'🔧 安装缺失依赖: {missing_deps}')
+    for dep in missing_deps:
+        try:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-cache-dir', '--force-reinstall', dep])
+            print(f'✅ {dep} 安装成功')
+        except Exception as e:
+            print(f'❌ {dep} 安装失败: {e}')
+            sys.exit(1)
+
+    # 重新验证
+    try:
+        import flask_login
+        import flask
+        print('✅ 所有依赖验证通过')
+    except ImportError as e:
+        print(f'❌ 依赖验证仍然失败: {e}')
+        sys.exit(1)
+else:
+    print('✅ 所有依赖已就绪')
+"
+
+if [ $? -ne 0 ]; then
+    log_error "最终依赖检查失败，无法启动"
+    exit 1
+fi
+
 # 启动 Web 应用
 log_success "🌐 启动 Web 服务器..."
 

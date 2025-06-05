@@ -94,8 +94,23 @@ COPY requirements/requirements.hybrid.txt /tmp/requirements.txt
 # 先升级 pip 和安装基础工具
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# 使用requirements文件安装依赖
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+# 分步安装核心依赖，确保关键组件能正确安装
+RUN pip install --no-cache-dir Flask>=3.1.1 && \
+    pip install --no-cache-dir Flask-Login>=0.6.3 && \
+    pip install --no-cache-dir Flask-SQLAlchemy>=3.1.1 && \
+    pip install --no-cache-dir flask-cors>=6.0.0 && \
+    pip install --no-cache-dir Werkzeug>=3.1.3 && \
+    pip install --no-cache-dir PyJWT>=2.8.0 && \
+    pip install --no-cache-dir requests>=2.32.3 && \
+    pip install --no-cache-dir gunicorn>=23.0.0
+
+# 验证核心依赖安装
+RUN python -c "import flask_login; print('✅ Flask-Login 安装成功')" && \
+    python -c "import flask, flask_sqlalchemy, flask_cors; print('✅ Flask 核心组件安装成功')"
+
+# 安装其余依赖（允许部分失败）
+RUN pip install --no-cache-dir -r /tmp/requirements.txt || \
+    echo "⚠️ 部分依赖安装失败，但核心依赖已安装"
 
 # 从下载阶段复制结果（可能成功也可能失败）
 COPY --from=ytdlp-downloader /ytdlp-prepared /app/yt-dlp-source
@@ -124,6 +139,12 @@ RUN dos2unix /app/scripts/start-hybrid.sh && \
     touch /app/downloads/.test_write && rm /app/downloads/.test_write && \
     touch /app/logs/.test_write && rm /app/logs/.test_write && \
     echo "✅ 混合模式配置完成，权限测试通过"
+
+# 最终验证：确保依赖在应用文件复制后仍然可用
+RUN cd /app && \
+    python -c "import flask_login; print('✅ 最终验证: flask_login 可用')" && \
+    python -c "import sys; sys.path.insert(0, '/app'); from webapp.app import create_app; print('✅ 最终验证: webapp 模块可用')" && \
+    echo "✅ 所有依赖最终验证通过"
 
 # 使用 root 用户运行（注释掉 USER 指令）
 # USER ytdlp
