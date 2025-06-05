@@ -108,6 +108,82 @@ fi
 # 设置Python路径
 export PYTHONPATH="/app:$PYTHONPATH"
 
+# 运行时安装缺失的依赖
+echo "📦 检查和安装运行时依赖..."
+install_runtime_dependencies() {
+    local deps_to_install=()
+
+    # 检查 Telegram 相关依赖
+    if ! python -c "import pyrogram" 2>/dev/null; then
+        echo "⚠️ pyrogram 未安装，添加到安装列表"
+        deps_to_install+=("pyrogram>=2.0.0")
+    fi
+
+    if ! python -c "import filetype" 2>/dev/null; then
+        echo "⚠️ filetype 未安装，添加到安装列表"
+        deps_to_install+=("filetype>=1.2.0")
+    fi
+
+    # 检查 yt-dlp 核心依赖
+    if ! python -c "import Crypto" 2>/dev/null; then
+        echo "⚠️ pycryptodome 未安装，添加到安装列表"
+        deps_to_install+=("pycryptodome>=3.23.0")
+    fi
+
+    if ! python -c "import websockets" 2>/dev/null; then
+        echo "⚠️ websockets 未安装，添加到安装列表"
+        deps_to_install+=("websockets>=15.0.1")
+    fi
+
+    if ! python -c "import brotli" 2>/dev/null; then
+        echo "⚠️ brotli 未安装，添加到安装列表"
+        deps_to_install+=("brotli>=1.1.0")
+    fi
+
+    if ! python -c "import mutagen" 2>/dev/null; then
+        echo "⚠️ mutagen 未安装，添加到安装列表"
+        deps_to_install+=("mutagen>=1.47.0")
+    fi
+
+    if ! python -c "import certifi" 2>/dev/null; then
+        echo "⚠️ certifi 未安装，添加到安装列表"
+        deps_to_install+=("certifi>=2025.4.26")
+    fi
+
+    if ! python -c "import psutil" 2>/dev/null; then
+        echo "⚠️ psutil 未安装，添加到安装列表"
+        deps_to_install+=("psutil>=7.0.0")
+    fi
+
+    if ! python -c "import yt_dlp" 2>/dev/null; then
+        echo "⚠️ yt-dlp 未安装，添加到安装列表"
+        deps_to_install+=("yt-dlp>=2025.5.22")
+    fi
+
+    # 安装缺失的依赖
+    if [ ${#deps_to_install[@]} -gt 0 ]; then
+        echo "🔧 安装缺失的依赖: ${deps_to_install[*]}"
+        pip install --no-cache-dir "${deps_to_install[@]}" || echo "⚠️ 部分依赖安装失败，继续启动"
+    else
+        echo "✅ 所有必需依赖已安装"
+    fi
+
+    # 尝试安装 TgCrypto（可选，失败不影响启动）
+    if ! python -c "import TgCrypto" 2>/dev/null; then
+        echo "🔧 尝试安装 TgCrypto 以提升 Telegram 性能..."
+        if pip install --no-cache-dir TgCrypto>=1.2.5 2>/dev/null; then
+            echo "✅ TgCrypto 安装成功"
+        else
+            echo "⚠️ TgCrypto 安装失败，将使用较慢的加密方式"
+        fi
+    else
+        echo "✅ TgCrypto 已安装"
+    fi
+}
+
+# 执行运行时依赖安装
+install_runtime_dependencies
+
 # 调试信息
 echo "🔍 调试信息..."
 echo "当前目录: $(pwd)"

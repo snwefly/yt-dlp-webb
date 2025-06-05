@@ -332,6 +332,7 @@ build_image() {
         --build-arg "YTDLP_SOURCE=$YTDLP_SOURCE"
         --build-arg "YTDLP_VERSION=$YTDLP_VERSION"
         --build-arg "ENVIRONMENT=$ENVIRONMENT"
+        --platform "linux/amd64"  # 默认只构建 AMD64，避免多平台问题
         -t "$IMAGE_TAG"
         -f "$DOCKERFILE"
     )

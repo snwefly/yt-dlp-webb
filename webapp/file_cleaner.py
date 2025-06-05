@@ -74,7 +74,7 @@ class FileCleanupManager:
     def cleanup_files(self):
         """执行文件清理"""
         if not self.download_folder.exists():
-            return
+            return 0
 
         self.logger.info("开始清理文件...")
 
@@ -95,6 +95,42 @@ class FileCleanupManager:
             self.logger.info(f"清理完成: 删除了 {total_cleaned} 个文件")
 
         return total_cleaned
+
+    def cleanup_completed_downloads(self):
+        """清理已完成的下载记录对应的文件"""
+        try:
+            from .core.download_manager import get_download_manager
+            from flask import current_app
+
+            download_manager = get_download_manager(current_app)
+            if not download_manager:
+                self.logger.warning("下载管理器未初始化")
+                return 0
+
+            # 获取所有已完成的下载记录
+            completed_downloads = download_manager.get_downloads_by_status('completed')
+
+            cleaned_count = 0
+            for download in completed_downloads:
+                file_path = download.get('file_path')
+                if file_path and os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        cleaned_count += 1
+                        self.logger.info(f"删除已完成下载文件: {file_path}")
+
+                        # 可选：同时删除下载记录
+                        # download_manager.delete_download(download['id'])
+
+                    except Exception as e:
+                        self.logger.error(f"删除文件失败 {file_path}: {e}")
+
+            self.logger.info(f"清理已完成下载: 删除了 {cleaned_count} 个文件")
+            return cleaned_count
+
+        except Exception as e:
+            self.logger.error(f"清理已完成下载失败: {e}")
+            return 0
 
     def _cleanup_expired_files(self):
         """清理过期文件"""
