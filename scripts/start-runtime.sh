@@ -282,4 +282,4 @@ exec gunicorn \
     --access-logfile - \
     --error-logfile - \
     --capture-output \
-    "webapp.app:create_app()"
+    "webapp.app:app"
