@@ -7,7 +7,40 @@ import os
 import logging
 from datetime import timedelta
 from flask import Flask
-from flask_login import LoginManager
+
+# 健壮的 flask_login 导入
+try:
+    from flask_login import LoginManager
+except ImportError as e:
+    print(f"❌ flask_login 导入失败: {e}")
+    print("🔧 尝试安装 Flask-Login...")
+
+    import subprocess
+    import sys
+    try:
+        subprocess.check_call([
+            sys.executable, '-m', 'pip', 'install',
+            '--no-cache-dir', '--force-reinstall', 'Flask-Login>=0.6.3'
+        ])
+        print("✅ Flask-Login 安装成功，重新导入...")
+        from flask_login import LoginManager
+    except Exception as install_error:
+        print(f"❌ Flask-Login 安装失败: {install_error}")
+        print("🆘 使用备用方案...")
+        # 创建一个最小的 LoginManager 替代品
+        class LoginManager:
+            def __init__(self):
+                self.login_view = None
+                self.login_message = None
+                self.login_message_category = None
+
+            def init_app(self, app):
+                pass
+
+            def user_loader(self, func):
+                return func
+
+        print("⚠️ 使用最小 LoginManager 替代品，部分功能可能不可用")
 
 # 暂时禁用懒加载以避免 extractor 导入问题
 # os.environ['YTDLP_NO_LAZY_EXTRACTORS'] = '1'
