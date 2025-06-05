@@ -178,11 +178,8 @@ install_runtime_dependencies() {
 # 执行运行时依赖安装
 install_runtime_dependencies
 
-# 修复 extractor 导入问题
-log_info "🔧 修复 extractor 导入问题..."
-if [ -f "/app/scripts/fix_extractor_imports.py" ]; then
-    python /app/scripts/fix_extractor_imports.py || log_warning "extractor 修复失败，继续启动"
-fi
+# 跳过 extractor 修复，避免与 yt-dlp 内部机制冲突
+log_info "ℹ️ 跳过 extractor 修复，使用 yt-dlp 原生机制"
 
 # 使用通用 yt-dlp 安装脚本
 log_info "🔧 安装和验证 yt-dlp..."
@@ -206,8 +203,7 @@ fi
 
 
 
-# 跳过 extractor 修复，避免与 yt-dlp 内部机制冲突
-log_info "ℹ️ 跳过 extractor 修复，使用 yt-dlp 原生机制"
+
 
 # 验证 webapp 模块
 log_info "🔍 验证 webapp 模块..."

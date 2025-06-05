@@ -283,13 +283,8 @@ class TelegramNotifier:
             logger.info(f"🔄 Bot API 失败，尝试 Pyrogram...")
 
             # 使用统一的单例客户端，确保前后端一致性
-            # 创建事件循环来运行异步方法
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(self._send_message_with_pyrogram(message, parse_mode))
-            finally:
-                loop.close()
+            # 使用统一的异步执行方法
+            return await self._send_message_with_pyrogram(message, parse_mode)
 
         except Exception as e:
             print(f"❌ Pyrogram 消息发送失败: {e}")
@@ -424,15 +419,62 @@ class TelegramNotifier:
             return False
 
         try:
-            # 在新的事件循环中运行异步方法
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # 检查是否已有事件循环
             try:
-                return loop.run_until_complete(self._send_message_async(message, parse_mode))
-            finally:
-                loop.close()
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 如果事件循环正在运行，使用线程池执行
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._run_async_in_thread, self._send_message_async, message, parse_mode)
+                        return future.result(timeout=60)
+                else:
+                    return loop.run_until_complete(self._send_message_async(message, parse_mode))
+            except RuntimeError:
+                # 没有事件循环，创建新的
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(self._send_message_async(message, parse_mode))
+                finally:
+                    loop.close()
         except Exception as e:
             logger.error(f"❌ 同步消息发送失败: {e}")
+            return False
+
+    def _run_async_in_thread(self, async_func, *args, **kwargs):
+        """在新线程中运行异步函数"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(async_func(*args, **kwargs))
+        finally:
+            loop.close()
+
+    def _run_async_safely(self, async_func, *args, **kwargs):
+        """安全地运行异步函数，统一事件循环管理"""
+        try:
+            # 检查是否已有事件循环
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # 如果事件循环正在运行，使用线程池执行
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._run_async_in_thread, async_func, *args, **kwargs)
+                        return future.result(timeout=300)  # 5分钟超时
+                else:
+                    return loop.run_until_complete(async_func(*args, **kwargs))
+            except RuntimeError:
+                # 没有事件循环，创建新的
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(async_func(*args, **kwargs))
+                finally:
+                    loop.close()
+        except Exception as e:
+            logger.error(f"❌ 异步函数执行失败: {e}")
             return False
     
 
@@ -501,13 +543,8 @@ class TelegramNotifier:
             logger.info(f"📤 使用 Pyrogram 发送文件 ({file_size_mb:.1f}MB)")
 
             try:
-                # 使用 Pyrogram 方案
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(self._send_file_with_pyrogram(file_path, caption, parse_mode))
-                finally:
-                    loop.close()
+                # 使用 Pyrogram 方案，复用事件循环管理逻辑
+                return self._run_async_safely(self._send_file_with_pyrogram, file_path, caption, parse_mode)
             except Exception as e:
                 print(f"❌ Pyrogram 发送失败: {e}")
                 logger.error(f"❌ Pyrogram 发送失败: {e}")
