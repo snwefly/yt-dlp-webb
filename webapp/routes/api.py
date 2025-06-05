@@ -882,18 +882,20 @@ def cleanup_files():
 
         cleaned_count = 0
 
-        if cleanup_type == 'completed':
-            # 清理已完成的下载记录对应的文件
-            cleaned_count = cleanup_mgr.cleanup_completed_downloads()
+        if cleanup_type == 'completed' or cleanup_type == 'all':
+            # 清理所有下载文件
+            cleaned_count = cleanup_mgr.cleanup_all_files()
         elif cleanup_type == 'expired':
             # 清理过期文件
             cleaned_count = cleanup_mgr._cleanup_expired_files()
         elif cleanup_type == 'temp':
             # 清理临时文件
             cleaned_count = cleanup_mgr._cleanup_temp_files()
-        elif cleanup_type == 'all':
-            # 执行完整清理
-            cleaned_count = cleanup_mgr.cleanup_files()
+        elif cleanup_type == 'pattern':
+            # 按模式清理文件
+            pattern = data.get('pattern', '*')
+            keep_recent = data.get('keep_recent', 0)
+            cleaned_count = cleanup_mgr.cleanup_files_by_pattern(pattern, keep_recent)
         else:
             return jsonify({'error': '无效的清理类型'}), 400
 

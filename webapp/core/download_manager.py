@@ -738,43 +738,42 @@ class DownloadManager:
             return None
 
     def list_downloaded_files(self):
-        """列出所有已下载的文件"""
+        """列出所有已下载的文件 - 直接读取下载目录"""
         files = []
         download_dir = os.environ.get('DOWNLOAD_FOLDER', '/app/downloads')
 
-        # 首先从内存中的下载记录获取
-        with self.lock:
-            for download_id, download in self.downloads.items():
-                if download.get('status') == 'completed' and download.get('file_path'):
+        if not os.path.exists(download_dir):
+            logger.warning(f"下载目录不存在: {download_dir}")
+            return files
+
+        try:
+            # 直接扫描下载目录中的所有文件
+            for filename in os.listdir(download_dir):
+                file_path = os.path.join(download_dir, filename)
+                if os.path.isfile(file_path):
+                    # 获取文件信息
+                    stat = os.stat(file_path)
+
+                    # 尝试从内存中获取原始URL信息（如果有的话）
+                    original_url = '未知'
+                    with self.lock:
+                        for download_id, download in self.downloads.items():
+                            if download.get('filename') == filename:
+                                original_url = download.get('url', '未知')
+                                break
+
                     files.append({
-                        'download_id': download_id,
-                        'filename': download.get('filename'),
-                        'file_size': download.get('file_size', 0),
-                        'created_at': download.get('created_at'),
-                        'download_url': download.get('download_url'),
-                        'original_url': download.get('url'),
-                        'file_path': download.get('file_path')
+                        'download_id': f'file_{filename}',
+                        'filename': filename,
+                        'file_size': stat.st_size,
+                        'created_at': stat.st_mtime,
+                        'download_url': f'/api/download-file/{filename}',
+                        'original_url': original_url,
+                        'file_path': file_path
                     })
 
-        # 如果内存中没有记录，扫描下载目录
-        if not files and os.path.exists(download_dir):
-            try:
-                for filename in os.listdir(download_dir):
-                    file_path = os.path.join(download_dir, filename)
-                    if os.path.isfile(file_path):
-                        # 获取文件信息
-                        stat = os.stat(file_path)
-                        files.append({
-                            'download_id': f'file_{filename}',
-                            'filename': filename,
-                            'file_size': stat.st_size,
-                            'created_at': stat.st_mtime,
-                            'download_url': f'/api/download-file/{filename}',
-                            'original_url': '未知',
-                            'file_path': file_path
-                        })
-            except Exception as e:
-                logger.error(f"扫描下载目录失败: {e}")
+        except Exception as e:
+            logger.error(f"扫描下载目录失败: {e}")
 
         # 按创建时间排序，最新的在前
         files.sort(key=lambda x: x.get('created_at', 0), reverse=True)

@@ -97,39 +97,71 @@ class FileCleanupManager:
         return total_cleaned
 
     def cleanup_completed_downloads(self):
-        """清理已完成的下载记录对应的文件"""
+        """清理所有下载文件 - 直接清理下载目录中的文件"""
         try:
-            from .core.download_manager import get_download_manager
-            from flask import current_app
-
-            download_manager = get_download_manager(current_app)
-            if not download_manager:
-                self.logger.warning("下载管理器未初始化")
+            if not self.download_folder.exists():
+                self.logger.warning(f"下载目录不存在: {self.download_folder}")
                 return 0
 
-            # 获取所有已完成的下载记录
-            completed_downloads = download_manager.get_downloads_by_status('completed')
-
             cleaned_count = 0
-            for download in completed_downloads:
-                file_path = download.get('file_path')
-                if file_path and os.path.exists(file_path):
+
+            # 直接扫描下载目录中的所有文件
+            for file_path in self.download_folder.glob('*'):
+                if file_path.is_file():
                     try:
-                        os.remove(file_path)
+                        file_path.unlink()
                         cleaned_count += 1
-                        self.logger.info(f"删除已完成下载文件: {file_path}")
-
-                        # 可选：同时删除下载记录
-                        # download_manager.delete_download(download['id'])
-
+                        self.logger.info(f"删除下载文件: {file_path.name}")
                     except Exception as e:
                         self.logger.error(f"删除文件失败 {file_path}: {e}")
 
-            self.logger.info(f"清理已完成下载: 删除了 {cleaned_count} 个文件")
+            self.logger.info(f"清理下载文件: 删除了 {cleaned_count} 个文件")
             return cleaned_count
 
         except Exception as e:
-            self.logger.error(f"清理已完成下载失败: {e}")
+            self.logger.error(f"清理下载文件失败: {e}")
+            return 0
+
+    def cleanup_all_files(self):
+        """清理所有文件 - 直接清理下载目录"""
+        return self.cleanup_completed_downloads()
+
+    def cleanup_files_by_pattern(self, pattern='*', keep_recent=0):
+        """按模式清理文件"""
+        try:
+            if not self.download_folder.exists():
+                self.logger.warning(f"下载目录不存在: {self.download_folder}")
+                return 0
+
+            # 获取匹配的文件
+            files = list(self.download_folder.glob(pattern))
+            files = [f for f in files if f.is_file()]
+
+            if not files:
+                self.logger.info(f"没有找到匹配模式 '{pattern}' 的文件")
+                return 0
+
+            # 按修改时间排序，最新的在前
+            files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+            cleaned_count = 0
+            for i, file_path in enumerate(files):
+                # 保留最近的文件
+                if i < keep_recent:
+                    continue
+
+                try:
+                    file_path.unlink()
+                    cleaned_count += 1
+                    self.logger.info(f"删除文件: {file_path.name}")
+                except Exception as e:
+                    self.logger.error(f"删除文件失败 {file_path}: {e}")
+
+            self.logger.info(f"按模式 '{pattern}' 清理: 删除了 {cleaned_count} 个文件")
+            return cleaned_count
+
+        except Exception as e:
+            self.logger.error(f"按模式清理文件失败: {e}")
             return 0
 
     def _cleanup_expired_files(self):

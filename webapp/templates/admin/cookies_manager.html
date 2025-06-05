@@ -91,8 +91,8 @@
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="importMode" id="modeStandard" value="standard" checked>
                                             <label class="form-check-label" for="modeStandard">
-                                                <strong>标准模式</strong><br>
-                                                <small class="text-muted">自动转换格式，按平台分离</small>
+                                                <strong>🔄 智能模式</strong><br>
+                                                <small class="text-muted">自动处理并按平台分类保存</small>
                                             </label>
                                         </div>
                                     </div>
@@ -100,8 +100,8 @@
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="importMode" id="modePreserve" value="preserve">
                                             <label class="form-check-label" for="modePreserve">
-                                                <strong>保持格式</strong><br>
-                                                <small class="text-muted">保持原始格式，仅清理过期</small>
+                                                <strong>🧹 清理模式</strong><br>
+                                                <small class="text-muted">保持原格式，只删除过期cookies</small>
                                             </label>
                                         </div>
                                     </div>
@@ -109,10 +109,19 @@
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="importMode" id="modeRaw" value="raw">
                                             <label class="form-check-label" for="modeRaw">
-                                                <strong>原始模式</strong><br>
-                                                <small class="text-muted">完全保持原样，不做转换</small>
+                                                <strong>📋 直接导入</strong><br>
+                                                <small class="text-muted">完全不修改，直接保存</small>
                                             </label>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- 模式说明 -->
+                                <div class="mt-2">
+                                    <div class="alert alert-info py-2" id="modeDescription">
+                                        <small>
+                                            <strong>智能模式</strong>：推荐使用。自动识别cookies格式，转换为标准格式，按YouTube、Twitter等平台分类保存，清理过期cookies。
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -171,11 +180,12 @@
                             <div class="mb-3">
                                 <div class="form-text">
                                     <small>
-                                        <strong>完整备份模式</strong>：自动备份所有cookies并按平台分离到独立文件<br>
-                                        <small class="text-muted">
-                                            支持平台：YouTube、Twitter/X、Instagram、TikTok、Bilibili等<br>
-                                            下载时系统根据URL智能选择对应平台的cookies文件
-                                        </small>
+                                        <strong>💡 使用提示</strong>：
+                                        <ul class="mb-0 mt-1">
+                                            <li>支持平台：YouTube、Twitter/X、Instagram、TikTok、Bilibili等</li>
+                                            <li>下载时系统会根据视频URL自动选择对应平台的cookies</li>
+                                            <li>导入前会自动备份现有cookies，确保数据安全</li>
+                                        </ul>
                                     </small>
                                 </div>
                             </div>
@@ -319,11 +329,29 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name="importMode"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const platformSelection = document.getElementById('platformSelection');
+            const modeDescription = document.getElementById('modeDescription');
+
+            // 显示/隐藏平台选择
             if (this.value === 'raw') {
                 platformSelection.style.display = 'block';
             } else {
                 platformSelection.style.display = 'none';
             }
+
+            // 更新模式说明
+            let description = '';
+            switch(this.value) {
+                case 'standard':
+                    description = '<strong>智能模式</strong>：推荐使用。自动识别cookies格式，转换为标准格式，按YouTube、Twitter等平台分类保存，清理过期cookies。';
+                    break;
+                case 'preserve':
+                    description = '<strong>清理模式</strong>：保持cookies的原始格式不变，只删除已过期的cookies，适合已经是正确格式的cookies文件。';
+                    break;
+                case 'raw':
+                    description = '<strong>直接导入</strong>：完全不修改cookies内容，直接保存到指定平台文件。适合高级用户或特殊格式的cookies。';
+                    break;
+            }
+            modeDescription.innerHTML = `<small>${description}</small>`;
         });
     });
 

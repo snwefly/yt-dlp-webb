@@ -3,12 +3,39 @@
 认证相关路由 - 使用Flask-Login
 """
 
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 import logging
+import jwt
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__)
+
+def generate_jwt_token(user):
+    """生成JWT token"""
+    try:
+        # 获取密钥，如果没有设置则使用默认值
+        secret_key = current_app.config.get('SECRET_KEY', 'your-secret-key-here')
+
+        # 设置token过期时间（24小时）
+        expiration = datetime.utcnow() + timedelta(hours=24)
+
+        # 创建payload
+        payload = {
+            'user_id': user.id,
+            'username': user.username,
+            'is_admin': user.is_admin,
+            'exp': expiration,
+            'iat': datetime.utcnow()
+        }
+
+        # 生成token
+        token = jwt.encode(payload, secret_key, algorithm='HS256')
+        return token
+    except Exception as e:
+        logger.error(f"生成JWT token失败: {e}")
+        return None
 
 @auth_bp.route('/login', methods=['GET'])
 def login():
@@ -65,12 +92,21 @@ def login_post():
         logger.info(f"✅ 登录成功: {username}")
 
         if request.is_json:
-            return jsonify({
+            # 生成JWT token
+            token = generate_jwt_token(user)
+            response_data = {
                 'success': True,
                 'message': '登录成功',
                 'username': user.username,
                 'is_admin': user.is_admin
-            })
+            }
+
+            # 如果token生成成功，添加到响应中
+            if token:
+                response_data['token'] = token
+                response_data['expires_in'] = 86400  # 24小时，单位秒
+
+            return jsonify(response_data)
         else:
             # 重定向到原来要访问的页面或主页
             next_page = request.args.get('next')
