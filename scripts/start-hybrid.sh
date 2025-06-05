@@ -118,6 +118,12 @@ install_runtime_dependencies() {
         deps_to_install+=("filetype>=1.2.0")
     fi
 
+    # 检查 JWT 依赖
+    if ! python -c "import jwt" 2>/dev/null; then
+        log_warning "PyJWT 未安装，添加到安装列表"
+        deps_to_install+=("PyJWT>=2.8.0")
+    fi
+
     # 检查 yt-dlp 核心依赖
     if ! python -c "import Crypto" 2>/dev/null; then
         log_warning "pycryptodome 未安装，添加到安装列表"

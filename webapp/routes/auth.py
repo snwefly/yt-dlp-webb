@@ -6,7 +6,10 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 import logging
-import jwt
+try:
+    import jwt as pyjwt  # 明确使用PyJWT库
+except ImportError:
+    pyjwt = None
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -15,6 +18,11 @@ auth_bp = Blueprint('auth', __name__)
 def generate_jwt_token(user):
     """生成JWT token"""
     try:
+        # 检查PyJWT是否可用
+        if pyjwt is None:
+            logger.warning("PyJWT库不可用，跳过token生成")
+            return None
+
         # 获取密钥，如果没有设置则使用默认值
         secret_key = current_app.config.get('SECRET_KEY', 'your-secret-key-here')
 
@@ -31,7 +39,7 @@ def generate_jwt_token(user):
         }
 
         # 生成token
-        token = jwt.encode(payload, secret_key, algorithm='HS256')
+        token = pyjwt.encode(payload, secret_key, algorithm='HS256')
         return token
     except Exception as e:
         logger.error(f"生成JWT token失败: {e}")
