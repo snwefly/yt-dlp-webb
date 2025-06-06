@@ -317,7 +317,18 @@ class AppInitializer:
 
 def create_and_initialize_app(config=None) -> Flask:
     """创建并初始化应用的便捷函数"""
-    app = Flask(__name__)
+    import os
+
+    # 计算正确的 webapp 目录路径
+    current_file = os.path.abspath(__file__)  # app_initializer.py 的路径
+    core_dir = os.path.dirname(current_file)  # webapp/core 目录
+    webapp_dir = os.path.dirname(core_dir)    # webapp 目录
+
+    # 创建 Flask 应用，指定正确的模板和静态文件目录
+    app = Flask('webapp',
+                template_folder=os.path.join(webapp_dir, 'templates'),
+                static_folder=os.path.join(webapp_dir, 'static'))
+
     initializer = AppInitializer(app)
     initializer.initialize_all(config)
     return app

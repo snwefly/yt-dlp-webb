@@ -212,13 +212,30 @@ def get_app():
     return create_app()
 
 # WSGI 应用实例（用于 gunicorn）
-application = create_app()
+# 使用延迟初始化避免导入时的应用上下文问题
+_app_instance = None
 
-# 为了兼容性，提供 app 变量
+def get_application():
+    """获取应用实例（延迟初始化）"""
+    global _app_instance
+    if _app_instance is None:
+        try:
+            _app_instance = create_app()
+            logger.info("✅ Flask 应用实例创建成功")
+        except Exception as e:
+            logger.error(f"❌ Flask 应用实例创建失败: {e}")
+            raise
+    return _app_instance
+
+# 为 gunicorn 提供应用对象 - 使用函数调用确保延迟初始化
+def application(environ, start_response):
+    """WSGI 应用入口点"""
+    app = get_application()
+    return app(environ, start_response)
+
+# 为了兼容性，同时提供 app 变量（指向同一个 WSGI 函数）
+app = application
+
 if __name__ == '__main__':
     app = create_app()
     app.run(host='0.0.0.0', port=8080, debug=False)
-else:
-    # 不在模块级别创建应用实例，避免应用上下文问题
-    # gunicorn 将使用工厂函数模式
-    app = None
