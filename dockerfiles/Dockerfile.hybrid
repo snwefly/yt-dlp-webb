@@ -140,11 +140,8 @@ RUN dos2unix /app/scripts/start-hybrid.sh && \
     touch /app/logs/.test_write && rm /app/logs/.test_write && \
     echo "✅ 混合模式配置完成，权限测试通过"
 
-# 最终验证：确保依赖在应用文件复制后仍然可用
-RUN cd /app && \
-    python -c "import flask_login; print('✅ 最终验证: flask_login 可用')" && \
-    python -c "import sys; sys.path.insert(0, '/app'); from webapp.app import create_app; print('✅ 最终验证: webapp 模块可用')" && \
-    echo "✅ 所有依赖最终验证通过"
+# 基础依赖验证（避免在构建时触发复杂的应用逻辑）
+RUN python -c "import flask_login, flask, flask_sqlalchemy, gunicorn; print('✅ 核心依赖验证通过')"
 
 # 使用 root 用户运行（注释掉 USER 指令）
 # USER ytdlp
