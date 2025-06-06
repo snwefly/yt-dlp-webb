@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, current_app, send_file
 from flask_login import login_required, current_user
 from ..core.ytdlp_manager import get_ytdlp_manager
 from ..core.download_manager import get_download_manager
+from ..core.error_handler import success_response, error_response, ValidationError, NotFoundError
 from ..utils import validate_url
 import logging
 import os
@@ -22,19 +23,19 @@ def get_video_info():
         # 确保 yt-dlp 已初始化
         ytdlp_manager = get_ytdlp_manager()
         if not ytdlp_manager.is_available():
-            return jsonify({'error': 'yt-dlp 服务不可用'}), 503
+            return error_response('yt-dlp 服务不可用', 503)
 
         # 支持 GET 和 POST 两种方法
         if request.method == 'GET':
             # GET 请求从查询参数获取 URL
             url = request.args.get('url')
             if not url:
-                return jsonify({'error': '需要提供 URL 参数'}), 400
+                return error_response('需要提供 URL 参数', 400)
         else:
             # POST 请求从 JSON 数据获取 URL
             data = request.get_json()
             if not data or 'url' not in data:
-                return jsonify({'error': '需要提供 URL'}), 400
+                return error_response('需要提供 URL', 400)
             url = data['url']
 
         url = url.strip()
@@ -43,7 +44,7 @@ def get_video_info():
         is_valid, error_msg = validate_url(url)
         if not is_valid:
             logger.warning(f"Invalid URL attempted: {url} - {error_msg}")
-            return jsonify({'error': f'URL验证失败: {error_msg}'}), 400
+            return error_response(f'URL验证失败: {error_msg}', 400)
 
         # YouTube cookies检查
         if 'youtube.com' in url or 'youtu.be' in url:
@@ -52,12 +53,15 @@ def get_video_info():
             status = cookies_manager.get_status()
 
             if not status['exists'] or status['status'] in ['expired', 'incomplete']:
-                return jsonify({
-                    'error': 'YouTube视频需要有效的cookies认证',
-                    'solution': '请在管理页面导入有效的YouTube cookies',
-                    'cookies_status': status['status'],
-                    'message': status['message']
-                }), 400
+                return error_response(
+                    'YouTube视频需要有效的cookies认证',
+                    400,
+                    {
+                        'solution': '请在管理页面导入有效的YouTube cookies',
+                        'cookies_status': status['status'],
+                        'message': status['message']
+                    }
+                )
 
         # 最简配置 - 让yt-dlp使用默认行为
         ydl_opts = {
@@ -150,10 +154,7 @@ def get_video_info():
                     })
             result['formats'] = formats
 
-        return jsonify({
-            'success': True,
-            'info': result
-        })
+        return success_response(result, '视频信息获取成功')
 
     except Exception as e:
         error_msg = str(e)
