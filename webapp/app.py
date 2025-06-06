@@ -211,10 +211,8 @@ def get_app():
     """获取应用实例（用于 gunicorn）"""
     return create_app()
 
-# WSGI 应用工厂（用于 gunicorn）
-def application():
-    """WSGI 应用工厂函数"""
-    return create_app()
+# WSGI 应用实例（用于 gunicorn）
+application = create_app()
 
 # 为了兼容性，提供 app 变量
 if __name__ == '__main__':
