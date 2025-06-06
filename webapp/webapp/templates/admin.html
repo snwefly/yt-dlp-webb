@@ -1,0 +1,1396 @@
+{% extends "base.html" %}
+
+{% block title %}管理员控制台 - yt-dlp{% endblock %}
+
+{% block extra_css %}
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #e1e8ed;
+        }
+
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #27ae60, #2ecc71);
+            transition: width 0.3s;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 25px;
+        }
+
+        .tab {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #7f8c8d;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #27ae60;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #f39c12;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .scenario-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .scenario-card h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .scenario-card p {
+            color: #555;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .scenario-card .scenario-settings {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="header-section p-4 text-center">
+        <h1 class="display-5 fw-bold mb-2">🛠️ 管理员控制台</h1>
+        <p class="lead mb-0">系统管理和配置</p>
+    </div>
+
+    <div class="p-4">
+        <div id="message-area"></div>
+
+        <!-- 仪表板概览 -->
+        <div class="dashboard-grid">
+            <!-- 存储信息卡片 -->
+            <div class="card">
+                <h3>💾 存储状态</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div id="total-files" class="stat-value">-</div>
+                        <div class="stat-label">文件总数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="total-size" class="stat-value">-</div>
+                        <div class="stat-label">已用空间</div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div id="storage-progress" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <span id="storage-usage">0%</span> / <span id="max-storage">2048 MB</span>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-warning" onclick="manualCleanup()">
+                        <span id="cleanup-text">立即清理</span>
+                        <span id="cleanup-loading" class="loading hidden"></span>
+                    </button>
+                    <button class="btn btn-danger" onclick="forceCleanup()">
+                        <span id="force-cleanup-text">强制清理</span>
+                        <span id="force-cleanup-loading" class="loading hidden"></span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="refreshStorage()">刷新</button>
+                </div>
+            </div>
+
+            <!-- 系统信息卡片 -->
+            <div class="card">
+                <h3>📊 系统信息</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div id="current-version" class="stat-value">-</div>
+                        <div class="stat-label">当前版本</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="last-update" class="stat-value">-</div>
+                        <div class="stat-label">最后更新</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="checkUpdate()">
+                        <span id="update-check-text">检查更新</span>
+                        <span id="update-check-loading" class="loading hidden"></span>
+                    </button>
+                    <button class="btn btn-success" onclick="startUpdate()" id="update-btn" style="display: none;">开始更新</button>
+                </div>
+            </div>
+
+            <!-- Cookies管理卡片 -->
+            <div class="card">
+                <h3>🍪 Cookies管理</h3>
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div id="cookies-status" class="stat-value">-</div>
+                        <div class="stat-label">状态</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="cookies-validity" class="stat-value">-</div>
+                        <div class="stat-label">有效性</div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-warning" onclick="navigateToCookiesManager()">
+                        🍪 管理Cookies
+                    </button>
+                    <button class="btn btn-info" onclick="navigateToTelegramSettings()">
+                        📱 Telegram设置
+                    </button>
+                    <button class="btn btn-secondary" onclick="checkCookiesStatus()">
+                        <span id="cookies-check-text">检查状态</span>
+                        <span id="cookies-check-loading" class="loading hidden"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配置标签页 -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" data-tab="cleanup">清理配置</button>
+                <button class="tab" data-tab="scenarios">使用场景</button>
+                <button class="tab" data-tab="security">安全设置</button>
+                <button class="tab" data-tab="advanced">高级设置</button>
+            </div>
+
+            <!-- 清理配置标签页 -->
+            <div id="cleanup-tab" class="tab-content active">
+                <form id="cleanup-config-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="auto-cleanup">启用自动清理：</label>
+                            <select id="auto-cleanup" name="auto_cleanup_enabled">
+                                <option value="true">启用</option>
+                                <option value="false">禁用</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cleanup-interval">清理检查间隔（小时）：</label>
+                            <input type="number" id="cleanup-interval" name="cleanup_interval_hours" min="0.5" max="24" step="0.5" value="1">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="file-retention">文件保留时间（小时）：</label>
+                            <input type="number" id="file-retention" name="file_retention_hours" min="1" max="168" value="24">
+                        </div>
+                        <div class="form-group">
+                            <label for="max-storage">最大存储空间（MB）：</label>
+                            <input type="number" id="max-storage-input" name="max_storage_mb" min="100" max="10240" value="2048">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="keep-recent">保留最近文件数：</label>
+                            <input type="number" id="keep-recent" name="keep_recent_files" min="1" max="100" value="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="temp-retention">临时文件保留（分钟）：</label>
+                            <input type="number" id="temp-retention" name="temp_file_retention_minutes" min="5" max="120" value="30">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="cleanup-on-download" name="cleanup_on_download" checked>
+                            下载完成后立即检查清理
+                        </label>
+                    </div>
+
+                    <div style="margin-top: 25px;">
+                        <button type="submit" class="btn btn-primary">
+                            <span id="save-config-text">保存配置</span>
+                            <span id="save-config-loading" class="loading hidden"></span>
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="loadConfig()">重置</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 使用场景标签页 -->
+            <div id="scenarios-tab" class="tab-content">
+                <div class="scenario-card">
+                    <h4>📱 场景1：正常使用</h4>
+                    <p>• 用户下载视频 → 文件保存24小时 → 自动删除</p>
+                    <p>• 临时文件30分钟后自动清理</p>
+                    <p>• 始终保留最近20个文件</p>
+                    <div class="scenario-settings">
+                        <button class="btn btn-primary" onclick="applyScenario('normal')">应用此场景</button>
+                        <small style="color: #7f8c8d;">文件保留: 24小时 | 存储限制: 2GB | 保留文件: 20个</small>
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <h4>💾 场景2：存储空间不足</h4>
+                    <p>• 检测到存储超过2GB → 立即清理最旧文件</p>
+                    <p>• 保留最近文件，确保用户体验</p>
+                    <p>• 更频繁的清理检查</p>
+                    <div class="scenario-settings">
+                        <button class="btn btn-warning" onclick="applyScenario('limited')">应用此场景</button>
+                        <small style="color: #7f8c8d;">文件保留: 12小时 | 存储限制: 1GB | 保留文件: 10个</small>
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <h4>🚀 场景3：大量下载</h4>
+                    <p>• 每次下载完成后检查存储</p>
+                    <p>• 如果接近限制，提前清理</p>
+                    <p>• 适合高频使用的服务器</p>
+                    <div class="scenario-settings">
+                        <button class="btn btn-success" onclick="applyScenario('heavy')">应用此场景</button>
+                        <small style="color: #7f8c8d;">文件保留: 6小时 | 存储限制: 4GB | 保留文件: 30个</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 安全设置标签页 -->
+            <div id="security-tab" class="tab-content">
+                <div class="form-group">
+                    <h4 style="color: #2c3e50; margin-bottom: 20px;">👤 用户名管理</h4>
+                    <form id="change-username-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="current-username">当前用户名：</label>
+                                <input type="text" id="current-username" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="new-username">新用户名：</label>
+                                <input type="text" id="new-username" name="new_username" required minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+">
+                                <small style="color: #7f8c8d;">3-20位字符，仅支持字母、数字和下划线</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="username-password">确认密码：</label>
+                            <input type="password" id="username-password" name="password" required>
+                            <small style="color: #7f8c8d;">输入当前密码以确认修改</small>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button type="submit" class="btn btn-warning">
+                                <span id="change-username-text">修改用户名</span>
+                                <span id="change-username-loading" class="loading hidden"></span>
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearUsernameForm()">清空</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="form-group" style="margin-top: 40px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 20px;">🔐 密码管理</h4>
+                    <form id="change-password-form">
+                        <div class="form-group">
+                            <label for="current-password">当前密码：</label>
+                            <input type="password" id="current-password" name="current_password" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="new-password">新密码：</label>
+                                <input type="password" id="new-password" name="new_password" required minlength="6">
+                                <small style="color: #7f8c8d;">密码长度至少6位</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="confirm-password">确认新密码：</label>
+                                <input type="password" id="confirm-password" name="confirm_password" required minlength="6">
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button type="submit" class="btn btn-primary">
+                                <span id="change-password-text">修改密码</span>
+                                <span id="change-password-loading" class="loading hidden"></span>
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearPasswordForm()">清空</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="form-group" style="margin-top: 40px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 20px;">🔒 会话管理</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="session-timeout-display">当前会话超时：</label>
+                            <input type="text" id="session-timeout-display" readonly>
+                            <small style="color: #7f8c8d;">通过环境变量 SESSION_TIMEOUT_HOURS 修改</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="active-sessions">活跃会话数：</label>
+                            <input type="text" id="active-sessions" readonly>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-warning" onclick="clearAllSessions()">清除所有会话</button>
+                        <button class="btn btn-secondary" onclick="refreshSessionInfo()">刷新信息</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 40px;">
+                    <h4 style="color: #2c3e50; margin-bottom: 20px;">✅ 安全说明</h4>
+                    <div style="background: #d4edda; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <p style="margin: 0; color: #155724;">
+                            <strong>密码永久保存：</strong>通过此页面修改的密码将永久保存到配置文件中，重启服务后仍然有效。
+                            新密码会覆盖环境变量中的默认密码。
+                        </p>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #6c757d; margin-top: 10px;">
+                        <p style="margin: 0; color: #495057;">
+                            <strong>安全建议：</strong>
+                            <br>• 使用至少8位字符的强密码
+                            <br>• 包含大小写字母、数字和特殊字符
+                            <br>• 定期更换密码以保持安全性
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 高级设置标签页 -->
+            <div id="advanced-tab" class="tab-content">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="admin-username">管理员用户名：</label>
+                        <input type="text" id="admin-username" value="admin" readonly>
+                        <small style="color: #7f8c8d;">通过环境变量 ADMIN_USERNAME 修改</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="session-timeout">会话超时（小时）：</label>
+                        <input type="number" id="session-timeout" min="1" max="72" value="24">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="download-folder">下载文件夹：</label>
+                    <input type="text" id="download-folder" readonly>
+                    <small style="color: #7f8c8d;">通过环境变量 DOWNLOAD_FOLDER 修改</small>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="btn btn-danger" onclick="clearAllFiles()">清空所有下载文件</button>
+                    <button class="btn btn-warning" onclick="restartService()">重启服务</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        // 页面加载完成后初始化 - 使用Flask-Login
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 使用Flask-Login认证状态检查
+            if (typeof window.ensureAuthSync === 'function') {
+                const isAuthenticated = await window.ensureAuthSync();
+                if (isAuthenticated) {
+                    // 认证成功，初始化页面
+                    initializeAdminPage();
+                } else {
+                    // 认证失败，跳转到登录页
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            } else {
+                // 检查基本认证状态
+                if (isAuthenticated && currentUser) {
+                    initializeAdminPage();
+                } else {
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+            }
+        });
+
+        // 初始化管理页面 - 使用Flask-Login
+        function initializeAdminPage() {
+            console.log('✅ 开始初始化管理页面');
+
+            // 设置用户名（如果元素存在）
+            if (currentUser) {
+                const usernameElement = document.getElementById('username');
+                if (usernameElement) {
+                    usernameElement.textContent = currentUser;
+                }
+
+                // 设置当前用户名到表单
+                const currentUsernameElement = document.getElementById('current-username');
+                if (currentUsernameElement) {
+                    currentUsernameElement.value = currentUser;
+                }
+
+                console.log('👤 当前用户:', currentUser);
+            }
+
+            // 初始化各个组件
+            initializeTabs();
+            loadConfig();
+            loadStorageInfo();
+            loadVersionInfo();
+            refreshSessionInfo();
+            // 延迟检查cookies状态
+            setTimeout(checkCookiesStatus, 1000);
+        }
+
+        // 旧的认证检查函数已删除，使用Flask-Login
+
+        // 初始化标签页
+        function initializeTabs() {
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTab = tab.dataset.tab;
+
+                    // 移除所有活动状态
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(tc => tc.classList.remove('active'));
+
+                    // 激活当前标签
+                    tab.classList.add('active');
+                    document.getElementById(targetTab + '-tab').classList.add('active');
+                });
+            });
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'success') {
+            const messageArea = document.getElementById('message-area');
+            const className = type === 'error' ? 'message error' :
+                             type === 'warning' ? 'message warning' : 'message success';
+
+            messageArea.innerHTML = `<div class="${className}" style="display: block;">${message}</div>`;
+
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+
+        // 设置加载状态
+        function setLoading(textId, loadingId, isLoading) {
+            const textElement = document.getElementById(textId);
+            const loadingElement = document.getElementById(loadingId);
+
+            if (isLoading) {
+                textElement.classList.add('hidden');
+                loadingElement.classList.remove('hidden');
+            } else {
+                textElement.classList.remove('hidden');
+                loadingElement.classList.add('hidden');
+            }
+        }
+
+        // 加载存储信息 - 使用Flask-Login
+        async function loadStorageInfo() {
+            try {
+                const response = await fetch('/api/admin/storage-info', {
+                    credentials: 'same-origin'  // 使用cookies认证
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.storage_info) {
+                        updateStorageDisplay(data.storage_info);
+                    } else {
+                        console.error('获取存储信息失败:', data.error);
+                    }
+                } else {
+                    console.error('获取存储信息失败，状态码:', response.status);
+                }
+            } catch (error) {
+                console.error('加载存储信息失败:', error);
+            }
+        }
+
+        // 更新存储显示
+        function updateStorageDisplay(data) {
+            document.getElementById('total-files').textContent = data.total_files;
+            document.getElementById('total-size').textContent = data.total_size_mb + ' MB';
+            document.getElementById('storage-usage').textContent = data.usage_percent + '%';
+            document.getElementById('max-storage').textContent = data.max_storage_mb + ' MB';
+
+            const progressBar = document.getElementById('storage-progress');
+            progressBar.style.width = data.usage_percent + '%';
+
+            // 根据使用率设置颜色
+            progressBar.className = 'progress-fill';
+            if (data.usage_percent > 80) {
+                progressBar.classList.add('danger');
+            } else if (data.usage_percent > 60) {
+                progressBar.classList.add('warning');
+            }
+        }
+
+        // 刷新存储信息
+        function refreshStorage() {
+            loadStorageInfo();
+            showMessage('存储信息已刷新');
+        }
+
+        // 手动清理 - 使用Flask-Login
+        async function manualCleanup() {
+            setLoading('cleanup-text', 'cleanup-loading', true);
+
+            try {
+                const response = await fetch('/api/admin/cleanup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'  // 使用cookies认证
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(`清理完成！删除了 ${data.cleaned_files} 个文件`);
+                    updateStorageDisplay(data.storage_info);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || '清理失败', 'error');
+                }
+            } catch (error) {
+                showMessage('清理过程中出现错误', 'error');
+            } finally {
+                setLoading('cleanup-text', 'cleanup-loading', false);
+            }
+        }
+
+        // 强制清理 - 删除除最新1个文件外的所有文件
+        async function forceCleanup() {
+            if (!confirm('确定要强制清理吗？这将删除除最新1个文件外的所有下载文件！')) {
+                return;
+            }
+
+            setLoading('force-cleanup-text', 'force-cleanup-loading', true);
+
+            try {
+                const response = await fetch('/api/admin/cleanup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ force: true })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(`强制清理完成！删除了 ${data.cleaned_files} 个文件`);
+                    updateStorageDisplay(data.storage_info);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || '强制清理失败', 'error');
+                }
+            } catch (error) {
+                showMessage('强制清理过程中出现错误', 'error');
+            } finally {
+                setLoading('force-cleanup-text', 'force-cleanup-loading', false);
+            }
+        }
+
+        // 加载版本信息 - 使用Flask-Login
+        async function loadVersionInfo() {
+            try {
+                const response = await fetch('/api/admin/version', {
+                    credentials: 'same-origin'  // 使用cookies认证
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.version_info) {
+                        // 显示yt-dlp版本，不是app版本
+                        document.getElementById('current-version').textContent = data.version_info.ytdlp_version;
+                        document.getElementById('last-update').textContent = data.version_info.last_updated;
+                    }
+                }
+            } catch (error) {
+                console.error('加载版本信息失败:', error);
+            }
+        }
+
+        // 检查更新
+        async function checkUpdate() {
+            setLoading('update-check-text', 'update-check-loading', true);
+
+            try {
+                const response = await fetch('/api/admin/update-check', {
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.update_available) {
+                        showMessage('发现新版本可用！', 'warning');
+                        document.getElementById('update-btn').style.display = 'inline-block';
+                    } else {
+                        showMessage('已是最新版本');
+                        document.getElementById('update-btn').style.display = 'none';
+                    }
+                } else {
+                    showMessage('检查更新失败', 'error');
+                }
+            } catch (error) {
+                showMessage('检查更新时出现错误', 'error');
+            } finally {
+                setLoading('update-check-text', 'update-check-loading', false);
+            }
+        }
+
+        // 开始更新
+        async function startUpdate() {
+            if (!confirm('确定要开始更新yt-dlp吗？更新过程可能需要1-2分钟。')) {
+                return;
+            }
+
+            // 显示更新进度
+            const updateBtn = document.getElementById('update-btn');
+            const originalText = updateBtn.innerHTML;
+            updateBtn.innerHTML = '更新中...';
+            updateBtn.disabled = true;
+
+            try {
+                showMessage('正在更新yt-dlp，请稍候...', 'warning');
+
+                const response = await fetch('/api/admin/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    if (data.updated) {
+                        showMessage(`✅ ${data.message}`, 'success');
+                        // 刷新版本信息
+                        setTimeout(() => {
+                            loadVersionInfo();
+                        }, 1000);
+                    } else {
+                        showMessage(`ℹ️ ${data.message}`, 'info');
+                    }
+                    updateBtn.style.display = 'none';
+                } else {
+                    const errorMsg = data.error || '更新失败';
+                    showMessage(`❌ ${errorMsg}`, 'error');
+                    console.error('更新失败详情:', data.details);
+                }
+            } catch (error) {
+                showMessage('❌ 更新过程中出现网络错误', 'error');
+                console.error('更新错误:', error);
+            } finally {
+                // 恢复按钮状态
+                updateBtn.innerHTML = originalText;
+                updateBtn.disabled = false;
+            }
+        }
+
+        // 登出 - 使用Flask-Login
+        async function logout() {
+            try {
+                await fetch('/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            }
+
+            window.location.href = '/login';
+        }
+
+        // 加载清理配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/admin/cleanup-config', {
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    const config = await response.json();
+                    populateConfigForm(config);
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+
+        // 填充配置表单
+        function populateConfigForm(config) {
+            document.getElementById('auto-cleanup').value = config.auto_cleanup_enabled.toString();
+            document.getElementById('cleanup-interval').value = config.cleanup_interval_hours;
+            document.getElementById('file-retention').value = config.file_retention_hours;
+            document.getElementById('max-storage-input').value = config.max_storage_mb;
+            document.getElementById('keep-recent').value = config.keep_recent_files;
+            document.getElementById('temp-retention').value = config.temp_file_retention_minutes;
+            document.getElementById('cleanup-on-download').checked = config.cleanup_on_download;
+        }
+
+        // 保存配置
+        document.getElementById('cleanup-config-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            setLoading('save-config-text', 'save-config-loading', true);
+
+            const formData = new FormData(this);
+            const config = {};
+
+            for (let [key, value] of formData.entries()) {
+                if (key === 'auto_cleanup_enabled' || key === 'cleanup_on_download') {
+                    config[key] = value === 'true' || value === 'on';
+                } else {
+                    config[key] = parseFloat(value) || value;
+                }
+            }
+
+            try {
+                const response = await fetch('/api/admin/cleanup-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(config)
+                });
+
+                if (response.ok) {
+                    showMessage('配置保存成功！');
+                    loadStorageInfo(); // 刷新存储信息
+                } else {
+                    const error = await response.json();
+                    showMessage(error.error || '保存配置失败', 'error');
+                }
+            } catch (error) {
+                showMessage('保存配置时出现错误', 'error');
+            } finally {
+                setLoading('save-config-text', 'save-config-loading', false);
+            }
+        });
+
+        // 应用预设场景
+        function applyScenario(scenario) {
+            const scenarios = {
+                'normal': {
+                    auto_cleanup_enabled: true,
+                    cleanup_interval_hours: 1,
+                    file_retention_hours: 24,
+                    max_storage_mb: 2048,
+                    keep_recent_files: 20,
+                    temp_file_retention_minutes: 30,
+                    cleanup_on_download: true
+                },
+                'limited': {
+                    auto_cleanup_enabled: true,
+                    cleanup_interval_hours: 0.5,
+                    file_retention_hours: 12,
+                    max_storage_mb: 1024,
+                    keep_recent_files: 10,
+                    temp_file_retention_minutes: 15,
+                    cleanup_on_download: true
+                },
+                'heavy': {
+                    auto_cleanup_enabled: true,
+                    cleanup_interval_hours: 0.25,
+                    file_retention_hours: 6,
+                    max_storage_mb: 4096,
+                    keep_recent_files: 30,
+                    temp_file_retention_minutes: 10,
+                    cleanup_on_download: true
+                }
+            };
+
+            const config = scenarios[scenario];
+            if (config) {
+                populateConfigForm(config);
+                showMessage(`已应用${scenario === 'normal' ? '正常使用' : scenario === 'limited' ? '存储受限' : '大量下载'}场景配置`);
+            }
+        }
+
+        // 清空所有文件
+        async function clearAllFiles() {
+            if (!confirm('确定要清空所有下载文件吗？此操作不可恢复！')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/cleanup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    showMessage('所有文件已清空');
+                    loadStorageInfo();
+                } else {
+                    showMessage('清空文件失败', 'error');
+                }
+            } catch (error) {
+                showMessage('清空文件时出现错误', 'error');
+            }
+        }
+
+        // 重启服务（仅显示提示）
+        function restartService() {
+            showMessage('请手动重启服务器以应用某些配置更改', 'warning');
+        }
+
+        // 密码修改功能
+        document.getElementById('change-password-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (newPassword !== confirmPassword) {
+                showMessage('新密码和确认密码不匹配', 'error');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showMessage('新密码长度至少6位', 'error');
+                return;
+            }
+
+            setLoading('change-password-text', 'change-password-loading', true);
+
+            try {
+                const response = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword,
+                        confirm_password: confirmPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('密码修改成功！', 'success');
+                    clearPasswordForm();
+                } else {
+                    showMessage(data.error || '密码修改失败', 'error');
+                }
+            } catch (error) {
+                showMessage('修改密码时出现错误', 'error');
+            } finally {
+                setLoading('change-password-text', 'change-password-loading', false);
+            }
+        });
+
+        // 清空密码表单
+        function clearPasswordForm() {
+            document.getElementById('change-password-form').reset();
+        }
+
+        // 用户名修改功能
+        document.getElementById('change-username-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const newUsername = document.getElementById('new-username').value.trim();
+            const password = document.getElementById('username-password').value;
+
+            // 验证用户名格式
+            const usernamePattern = /^[a-zA-Z0-9_]+$/;
+            if (!usernamePattern.test(newUsername)) {
+                showMessage('用户名只能包含字母、数字和下划线', 'error');
+                return;
+            }
+
+            if (newUsername.length < 3 || newUsername.length > 20) {
+                showMessage('用户名长度必须在3-20位之间', 'error');
+                return;
+            }
+
+            if (newUsername === currentUser) {
+                showMessage('新用户名不能与当前用户名相同', 'error');
+                return;
+            }
+
+            if (!password) {
+                showMessage('请输入当前密码以确认修改', 'error');
+                return;
+            }
+
+            setLoading('change-username-text', 'change-username-loading', true);
+
+            try {
+                const response = await fetch('/api/auth/change-username', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        new_username: newUsername,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('用户名修改成功！即将重新登录...', 'success');
+                    clearUsernameForm();
+
+                    // 延迟跳转到登录页面
+                    setTimeout(() => {
+                        window.location.href = '/login?message=' + encodeURIComponent('用户名已更新，请使用新用户名登录');
+                    }, 2000);
+                } else {
+                    showMessage(data.error || '用户名修改失败', 'error');
+                }
+            } catch (error) {
+                showMessage('修改用户名时出现错误', 'error');
+            } finally {
+                setLoading('change-username-text', 'change-username-loading', false);
+            }
+        });
+
+        // 清空用户名表单
+        function clearUsernameForm() {
+            document.getElementById('new-username').value = '';
+            document.getElementById('username-password').value = '';
+        }
+
+        // 刷新会话信息
+        async function refreshSessionInfo() {
+            try {
+                const response = await fetch('/api/auth/session-info', {
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const sessionInfo = data.session_info;
+
+                    document.getElementById('session-timeout-display').value =
+                        `${sessionInfo.timeout_hours} 小时 (剩余: ${sessionInfo.remaining_hours} 小时)`;
+
+                    // 这里可以添加活跃会话数的显示，需要后端支持
+                    document.getElementById('active-sessions').value = '1 个（当前会话）';
+
+                    showMessage('会话信息已刷新');
+                } else {
+                    showMessage('获取会话信息失败', 'error');
+                }
+            } catch (error) {
+                showMessage('刷新会话信息时出现错误', 'error');
+            }
+        }
+
+        // 清除所有会话
+        async function clearAllSessions() {
+            if (!confirm('确定要清除所有会话吗？这将强制所有用户重新登录。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/clear-all-sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    showMessage('所有会话已清除，即将重新登录...', 'warning');
+                    setTimeout(() => {
+                        // Token清理已移除，使用Flask-Login
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    showMessage('清除会话失败', 'error');
+                }
+            } catch (error) {
+                showMessage('清除会话时出现错误', 'error');
+            }
+        }
+
+        // 导航到Cookies管理页面
+        function navigateToCookiesManager() {
+            window.location.href = '/admin/cookies-manager';
+        }
+
+        // 导航到Telegram设置页面
+        function navigateToTelegramSettings() {
+            window.location.href = '/admin/telegram-settings';
+        }
+
+        // 检查cookies状态
+        async function checkCookiesStatus() {
+            const statusElement = document.getElementById('cookies-status');
+            const validityElement = document.getElementById('cookies-validity');
+            const checkText = document.getElementById('cookies-check-text');
+            const checkLoading = document.getElementById('cookies-check-loading');
+
+            // 显示加载状态
+            checkText.classList.add('hidden');
+            checkLoading.classList.remove('hidden');
+            statusElement.textContent = '检查中';
+            validityElement.textContent = '检查中';
+
+            try {
+                const response = await fetch('/api/cookies/status', {
+                    credentials: 'same-origin'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // 更新状态显示
+                    if (data.exists) {
+                        switch (data.status) {
+                            case 'good':
+                                statusElement.textContent = '良好';
+                                statusElement.style.color = '#27ae60';
+                                break;
+                            case 'warning':
+                                statusElement.textContent = '注意';
+                                statusElement.style.color = '#f39c12';
+                                break;
+                            case 'expired':
+                                statusElement.textContent = '过期';
+                                statusElement.style.color = '#e74c3c';
+                                break;
+                            case 'incomplete':
+                                statusElement.textContent = '不完整';
+                                statusElement.style.color = '#e74c3c';
+                                break;
+                            default:
+                                statusElement.textContent = '未知';
+                                statusElement.style.color = '#95a5a6';
+                        }
+                    } else {
+                        statusElement.textContent = '不存在';
+                        statusElement.style.color = '#e74c3c';
+                    }
+
+                    // 测试有效性
+                    const testResponse = await fetch('/api/cookies/test', {
+                        credentials: 'same-origin'
+                    });
+
+                    if (testResponse.ok) {
+                        const testData = await testResponse.json();
+                        if (testData.valid) {
+                            validityElement.textContent = '有效';
+                            validityElement.style.color = '#27ae60';
+                        } else {
+                            validityElement.textContent = '无效';
+                            validityElement.style.color = '#e74c3c';
+                        }
+                    } else {
+                        validityElement.textContent = '测试失败';
+                        validityElement.style.color = '#e74c3c';
+                    }
+
+                    showMessage('Cookies状态检查完成');
+                } else {
+                    statusElement.textContent = '检查失败';
+                    validityElement.textContent = '检查失败';
+                    showMessage('检查cookies状态失败', 'error');
+                }
+            } catch (error) {
+                statusElement.textContent = '错误';
+                validityElement.textContent = '错误';
+                showMessage('检查cookies状态时出现错误', 'error');
+            } finally {
+                // 恢复按钮状态
+                checkText.classList.remove('hidden');
+                checkLoading.classList.add('hidden');
+            }
+        }
+    </script>
+{% endblock %}

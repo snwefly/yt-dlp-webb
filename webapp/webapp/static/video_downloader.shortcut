@@ -1,0 +1,190 @@
+{
+  "WFWorkflowMinimumClientVersionString": "900",
+  "WFWorkflowMinimumClientVersion": 900,
+  "WFWorkflowIcon": {
+    "WFWorkflowIconStartColor": 2071128575,
+    "WFWorkflowIconGlyphNumber": 59511
+  },
+  "WFWorkflowClientVersion": "2605.0.5",
+  "WFWorkflowOutputContentItemClasses": [],
+  "WFWorkflowHasOutputFallback": false,
+  "WFWorkflowActions": [
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getclipboard",
+      "WFWorkflowActionParameters": {}
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.choosefromlist",
+      "WFWorkflowActionParameters": {
+        "WFChooseFromListActionPrompt": "选择下载格式",
+        "WFChooseFromListActionSelectMultiple": false,
+        "WFChooseFromListActionSelectAll": false,
+        "WFChooseFromListActionItems": [
+          "🎬 最佳质量视频",
+          "📱 720P视频",
+          "💾 480P视频", 
+          "🎵 高品质MP3",
+          "🎶 标准MP3"
+        ]
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.text.replace",
+      "WFWorkflowActionParameters": {
+        "WFReplaceTextFind": "🎬 最佳质量视频",
+        "WFReplaceTextReplace": "video_best",
+        "WFReplaceTextRegularExpression": false
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.text.replace", 
+      "WFWorkflowActionParameters": {
+        "WFReplaceTextFind": "📱 720P视频",
+        "WFReplaceTextReplace": "video_720",
+        "WFReplaceTextRegularExpression": false
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.text.replace",
+      "WFWorkflowActionParameters": {
+        "WFReplaceTextFind": "💾 480P视频", 
+        "WFReplaceTextReplace": "video_480",
+        "WFReplaceTextRegularExpression": false
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.text.replace",
+      "WFWorkflowActionParameters": {
+        "WFReplaceTextFind": "🎵 高品质MP3",
+        "WFReplaceTextReplace": "audio_320",
+        "WFReplaceTextRegularExpression": false
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.text.replace",
+      "WFWorkflowActionParameters": {
+        "WFReplaceTextFind": "🎶 标准MP3", 
+        "WFReplaceTextReplace": "audio_192",
+        "WFReplaceTextRegularExpression": false
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+      "WFWorkflowActionParameters": {
+        "WFControlFlowMode": 0,
+        "WFConditionalActionString": "video_best",
+        "GroupingIdentifier": "format_check"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getcontentsofurl",
+      "WFWorkflowActionParameters": {
+        "WFHTTPMethod": "POST",
+        "WFHTTPHeaders": {
+          "Content-Type": "application/json"
+        },
+        "WFHTTPBodyType": "JSON",
+        "WFJSONValues": {
+          "url": {
+            "Value": {
+              "OutputUUID": "剪贴板内容",
+              "Type": "ActionOutput"
+            },
+            "WFSerializationType": "WFTextTokenAttachment"
+          },
+          "audio_only": "false",
+          "video_quality": "best",
+          "output_format": "mp4"
+        },
+        "WFURL": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.savetocameraroll",
+      "WFWorkflowActionParameters": {}
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+      "WFWorkflowActionParameters": {
+        "WFControlFlowMode": 1,
+        "GroupingIdentifier": "format_check"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+      "WFWorkflowActionParameters": {
+        "WFControlFlowMode": 0,
+        "WFConditionalActionString": "audio_320",
+        "GroupingIdentifier": "audio_check"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getcontentsofurl",
+      "WFWorkflowActionParameters": {
+        "WFHTTPMethod": "POST", 
+        "WFHTTPHeaders": {
+          "Content-Type": "application/json"
+        },
+        "WFHTTPBodyType": "JSON",
+        "WFJSONValues": {
+          "url": {
+            "Value": {
+              "OutputUUID": "剪贴板内容",
+              "Type": "ActionOutput"
+            },
+            "WFSerializationType": "WFTextTokenAttachment"
+          },
+          "audio_only": "true",
+          "audio_quality": "320", 
+          "output_format": "mp3"
+        },
+        "WFURL": "http://YOUR_SERVER_IP:8080/api/shortcuts/download-direct"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.documentpicker.save",
+      "WFWorkflowActionParameters": {
+        "WFFileDestinationPath": "iCloud Drive/Downloads"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+      "WFWorkflowActionParameters": {
+        "WFControlFlowMode": 2,
+        "GroupingIdentifier": "audio_check"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.conditional",
+      "WFWorkflowActionParameters": {
+        "WFControlFlowMode": 2,
+        "GroupingIdentifier": "format_check"
+      }
+    }
+  ],
+  "WFWorkflowInputContentItemClasses": [
+    "WFAppStoreAppContentItem",
+    "WFArticleContentItem", 
+    "WFContactContentItem",
+    "WFDateContentItem",
+    "WFEmailAddressContentItem",
+    "WFGenericFileContentItem",
+    "WFImageContentItem",
+    "WFiTunesProductContentItem",
+    "WFLocationContentItem",
+    "WFDCMapsLinkContentItem",
+    "WFAVAssetContentItem",
+    "WFPDFContentItem",
+    "WFPhoneNumberContentItem",
+    "WFRichTextContentItem",
+    "WFSafariWebPageContentItem",
+    "WFStringContentItem",
+    "WFURLContentItem"
+  ],
+  "WFWorkflowImportQuestions": [],
+  "WFWorkflowTypes": [
+    "Watch"
+  ],
+  "WFQuickActionSurfaces": [],
+  "WFWorkflowHasShortcutInputVariables": false
+}

@@ -1,0 +1,1032 @@
+{% extends "base.html" %}
+
+{% block title %}Telegram 自动下载设置{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 页面标题 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 bg-gradient-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-1">
+                                <i class="fab fa-telegram"></i> 
+                                Telegram 自动下载设置
+                            </h2>
+                            <p class="mb-0 opacity-75">配置 Telegram Bot，实现发送链接自动下载并推送文件</p>
+                        </div>
+                        <div class="btn-group">
+                            <button id="testConnection" class="btn btn-light">
+                                <i class="fas fa-test-tube"></i> 测试连接
+                            </button>
+                            <button id="testFilePush" class="btn btn-outline-light">
+                                <i class="fas fa-file-upload"></i> 测试文件推送
+                            </button>
+                            <button id="checkPushConfig" class="btn btn-outline-warning">
+                                <i class="fas fa-search"></i> 检查推送配置
+                            </button>
+                            <button id="setupWebhook" class="btn btn-outline-light">
+                                <i class="fas fa-link"></i> 设置Webhook
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要内容 -->
+    <div class="row">
+        <!-- 左侧：基础配置 -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog text-primary"></i> 基础配置
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="telegramConfigForm">
+                        <!-- Telegram API 配置 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="alert alert-info border-0">
+                                    <h6 class="alert-heading">
+                                        <i class="fas fa-key"></i> Telegram API 配置
+                                    </h6>
+                                    <p class="mb-3">
+                                        需要从 <a href="https://my.telegram.org" target="_blank" class="text-decoration-none">
+                                            <i class="fas fa-external-link-alt"></i> https://my.telegram.org
+                                        </a> 获取 API ID 和 API Hash
+                                    </p>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="apiId" class="form-label">
+                                                    <strong>API ID</strong>
+                                                    <small class="text-muted">从 my.telegram.org 获取</small>
+                                                </label>
+                                                <input type="text" class="form-control" id="apiId" name="api_id"
+                                                       placeholder="12345678">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="apiHash" class="form-label">
+                                                    <strong>API Hash</strong>
+                                                    <small class="text-muted">从 my.telegram.org 获取</small>
+                                                </label>
+                                                <input type="password" class="form-control" id="apiHash" name="api_hash"
+                                                       placeholder="abcdef1234567890abcdef1234567890">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-muted small">
+                                        <i class="fas fa-info-circle"></i>
+                                        这些参数用于 Pyrogram 客户端，支持大文件上传（50MB-2GB）
+                                    </div>
+
+                                    <!-- API 配置状态提示 -->
+                                    <div id="apiConfigStatus" class="mt-2" style="display: none;">
+                                        <div class="alert alert-warning alert-sm mb-0">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            <strong>可选配置：</strong>不配置 API ID/Hash 只能发送小文件（≤50MB），配置后可发送大文件（最大2GB）
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bot 配置 -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="botToken" class="form-label fw-bold">
+                                    <i class="fas fa-robot text-primary"></i> Bot Token
+                                </label>
+                                <input type="password" class="form-control" id="botToken" name="bot_token" 
+                                       placeholder="从 @BotFather 获取">
+                                <div class="form-text">
+                                    <a href="https://t.me/BotFather" target="_blank" class="text-decoration-none">
+                                        <i class="fas fa-external-link-alt"></i> 创建 Bot
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="chatId" class="form-label fw-bold">
+                                    <i class="fas fa-comments text-primary"></i> Chat ID
+                                </label>
+                                <input type="text" class="form-control" id="chatId" name="chat_id" 
+                                       placeholder="接收消息的聊天ID">
+                                <div class="form-text">
+                                    <a href="https://t.me/userinfobot" target="_blank" class="text-decoration-none">
+                                        <i class="fas fa-external-link-alt"></i> 获取 Chat ID
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 功能开关 -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <h6 class="fw-bold mb-3">
+                                    <i class="fas fa-toggle-on text-success"></i> 功能开关
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="enableTelegram" name="enabled">
+                                            <label class="form-check-label" for="enableTelegram">
+                                                启用 Telegram 通知
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="enableWebhook" name="webhook_enabled">
+                                            <label class="form-check-label" for="enableWebhook">
+                                                启用 Webhook 自动下载
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="autoDownload" name="auto_download">
+                                            <label class="form-check-label" for="autoDownload">
+                                                自动下载链接
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 推送设置 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="pushMode" class="form-label fw-bold">
+                                    <i class="fas fa-paper-plane text-primary"></i> 推送模式
+                                </label>
+                                <select class="form-select" id="pushMode" name="push_mode">
+                                    <option value="file">仅文件</option>
+                                    <option value="message">仅通知</option>
+                                    <option value="both">文件+通知</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="fileSizeLimit" class="form-label fw-bold">
+                                    <i class="fas fa-file-archive text-primary"></i> 文件大小限制 (MB)
+                                </label>
+                                <input type="number" class="form-control" id="fileSizeLimit" name="file_size_limit_mb" 
+                                       value="50" min="1" max="2000">
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 保存配置
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="loadConfig">
+                                <i class="fas fa-sync-alt"></i> 重新加载
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：Webhook 配置 -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-link text-warning"></i> Webhook 配置
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 端口限制说明 -->
+                    <div class="alert alert-warning border-0 mb-3">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-exclamation-triangle"></i> 端口限制
+                        </h6>
+                        <p class="mb-2">Telegram 只支持端口：<code>80, 88, 443, 8443</code></p>
+                        <p class="mb-0">您的服务运行在 <code>8090</code> 端口，需要使用代理</p>
+                    </div>
+
+                    <!-- 服务器地址配置 -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-server text-primary"></i> 目标服务器地址
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="targetServerUrl"
+                                   placeholder="http://your-domain.com:8090">
+                            <button class="btn btn-outline-primary" onclick="generateWorkerCode()" type="button">
+                                <i class="fas fa-code"></i> 生成代码
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="testJavaScript()" type="button">
+                                <i class="fas fa-bug"></i> 测试
+                            </button>
+                        </div>
+                        <div class="form-text">您的 yt-dlp 服务器地址（可自定义域名）</div>
+                    </div>
+
+                    <!-- Cloudflare Workers URL -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fab fa-cloudflare text-warning"></i> Cloudflare Worker URL
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="cloudflareWorkerUrl" 
+                                   placeholder="https://your-worker.workers.dev/telegram/webhook">
+                            <button class="btn btn-outline-secondary" onclick="copyCloudflareUrl()">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <a href="#" onclick="showCloudflareGuide()" class="text-decoration-none">
+                                <i class="fas fa-question-circle"></i> 如何配置？
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 直连 URL（仅显示） -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted">
+                            <i class="fas fa-times-circle text-danger"></i> 直连方式（不可用）
+                        </label>
+                        <input type="text" class="form-control" id="webhookUrl" readonly 
+                               placeholder="端口 8090 不被 Telegram 支持">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 状态卡片 -->
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle text-info"></i> 配置状态
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="configStatus">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-circle text-secondary me-2"></i>
+                            <span class="text-muted">等待配置...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 测试结果区域 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div id="testResults"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.card {
+    border-radius: 12px;
+    border: none;
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.alert {
+    border-radius: 10px;
+}
+
+.form-check-input:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+.input-group .btn {
+    border-radius: 0 8px 8px 0;
+}
+
+.input-group .form-control {
+    border-radius: 8px 0 0 8px;
+}
+</style>
+
+<script>
+// 页面初始化
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('页面初始化开始');
+
+    try {
+        // 设置默认服务器地址
+        const currentHost = window.location.host;
+        const targetServerInput = document.getElementById('targetServerUrl');
+        if (targetServerInput) {
+            targetServerInput.value = `http://${currentHost}`;
+            console.log('默认服务器地址设置为:', `http://${currentHost}`);
+        } else {
+            console.error('找不到 targetServerUrl 元素');
+        }
+
+        // 设置直连 Webhook URL
+        const webhookUrl = window.location.origin + '/telegram/webhook';
+        const webhookUrlInput = document.getElementById('webhookUrl');
+        if (webhookUrlInput) {
+            webhookUrlInput.value = webhookUrl;
+            console.log('Webhook URL 设置为:', webhookUrl);
+        } else {
+            console.error('找不到 webhookUrl 元素');
+        }
+
+        // 绑定事件
+        const form = document.getElementById('telegramConfigForm');
+        if (form) {
+            form.addEventListener('submit', saveTelegramConfig);
+            console.log('表单提交事件已绑定');
+        }
+
+        const loadBtn = document.getElementById('loadConfig');
+        if (loadBtn) {
+            loadBtn.addEventListener('click', loadTelegramConfig);
+            console.log('加载配置按钮事件已绑定');
+        }
+
+        const testBtn = document.getElementById('testConnection');
+        if (testBtn) {
+            testBtn.addEventListener('click', testConnection);
+            console.log('测试连接按钮事件已绑定');
+        }
+
+        const testFilePushBtn = document.getElementById('testFilePush');
+        if (testFilePushBtn) {
+            testFilePushBtn.addEventListener('click', testFilePush);
+            console.log('测试文件推送按钮事件已绑定');
+        }
+
+        const checkPushConfigBtn = document.getElementById('checkPushConfig');
+        if (checkPushConfigBtn) {
+            checkPushConfigBtn.addEventListener('click', checkPushConfig);
+            console.log('检查推送配置按钮事件已绑定');
+        }
+
+        const webhookBtn = document.getElementById('setupWebhook');
+        if (webhookBtn) {
+            webhookBtn.addEventListener('click', setupWebhook);
+            console.log('设置Webhook按钮事件已绑定');
+        }
+
+        // 加载现有配置
+        loadTelegramConfig();
+        console.log('页面初始化完成');
+
+    } catch (error) {
+        console.error('页面初始化失败:', error);
+        alert('页面初始化失败: ' + error.message);
+    }
+});
+
+// 验证 API 配置
+function validateApiConfig() {
+    const apiId = document.getElementById('apiId').value.trim();
+    const apiHash = document.getElementById('apiHash').value.trim();
+
+    // API ID/Hash 是可选的，但如果填写了就要验证格式
+    if (apiId || apiHash) {
+        if (!apiId || !apiHash) {
+            showMessage('API ID 和 API Hash 必须同时填写或同时留空', 'warning');
+            return false;
+        }
+
+        // 验证 API ID 格式（应该是数字）
+        if (!/^\d+$/.test(apiId)) {
+            showMessage('API ID 应该是纯数字', 'danger');
+            return false;
+        }
+
+        // 验证 API Hash 格式（应该是32位十六进制字符串）
+        if (!/^[a-f0-9]{32}$/i.test(apiHash)) {
+            showMessage('API Hash 应该是32位十六进制字符串', 'danger');
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// 更新 API 配置状态显示
+function updateApiConfigStatus(config) {
+    const statusDiv = document.getElementById('apiConfigStatus');
+    const apiConfigured = config && config.api_id_configured && config.api_hash_configured;
+
+    if (!apiConfigured) {
+        statusDiv.style.display = 'block';
+    } else {
+        statusDiv.style.display = 'none';
+    }
+}
+
+// 生成 Worker 代码
+function generateWorkerCode() {
+    console.log('generateWorkerCode 函数被调用');
+
+    const targetServer = document.getElementById('targetServerUrl').value.trim();
+    console.log('目标服务器地址:', targetServer);
+
+    if (!targetServer) {
+        showMessage('请先填写目标服务器地址', 'warning');
+        return;
+    }
+
+    try {
+        new URL(targetServer);
+        console.log('URL 验证通过');
+    } catch (e) {
+        console.error('URL 验证失败:', e);
+        showMessage('服务器地址格式不正确', 'danger');
+        return;
+    }
+
+    const workerCode = `// Cloudflare Workers 代理脚本
+// 目标服务器: ${targetServer}
+const TARGET_SERVER = '${targetServer}';
+const WEBHOOK_PATH = '/telegram/webhook';
+
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request));
+});
+
+async function handleRequest(request) {
+  const url = new URL(request.url);
+
+  if (url.pathname === WEBHOOK_PATH) {
+    return await proxyToServer(request);
+  }
+
+  if (url.pathname === '/health') {
+    return new Response(JSON.stringify({status: 'ok', target: TARGET_SERVER}), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  if (url.pathname === '/') {
+    return new Response(\\\`<h1>YT-DLP Telegram Proxy</h1><p>Webhook URL: \\\${request.url}telegram/webhook</p><p>Target: \\\${TARGET_SERVER}</p>\\\`, {
+      headers: { 'Content-Type': 'text/html' }
+    });
+  }
+
+  return new Response('Not Found', { status: 404 });
+}
+
+async function proxyToServer(request) {
+  try {
+    const targetUrl = TARGET_SERVER + WEBHOOK_PATH;
+    const headers = new Headers();
+
+    ['content-type', 'content-length', 'x-telegram-bot-api-secret-token'].forEach(name => {
+      const value = request.headers.get(name);
+      if (value) headers.set(name, value);
+    });
+
+    headers.set('X-Forwarded-For', request.headers.get('CF-Connecting-IP') || 'unknown');
+    headers.set('X-Forwarded-Proto', 'https');
+
+    const response = await fetch(targetUrl, {
+      method: request.method,
+      headers: headers,
+      body: request.method !== 'GET' ? request.body : null,
+    });
+
+    return new Response(response.body, {
+      status: response.status,
+      headers: { 'Content-Type': response.headers.get('Content-Type') || 'application/json' }
+    });
+
+  } catch (error) {
+    return new Response(JSON.stringify({error: '代理服务器错误', message: error.message}), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}`;
+
+    console.log('准备显示生成的代码');
+    showGeneratedCode(workerCode, targetServer);
+}
+
+// 测试 JavaScript 功能
+function testJavaScript() {
+    console.log('JavaScript 测试函数被调用');
+    alert('JavaScript 功能正常！');
+    showMessage('JavaScript 测试成功', 'success');
+}
+
+// 显示生成的代码
+function showGeneratedCode(code, targetServer) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fab fa-cloudflare text-warning"></i>
+                        生成的 Cloudflare Worker 代码
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> 代码已生成</h6>
+                        <p class="mb-0">目标服务器: <code>${targetServer}</code></p>
+                    </div>
+
+                    <h6>📋 部署步骤</h6>
+                    <ol>
+                        <li>复制下面的代码</li>
+                        <li>登录 <a href="https://dash.cloudflare.com/" target="_blank">Cloudflare Dashboard</a></li>
+                        <li>创建新的 Worker（命名：yt-dlp-telegram-proxy）</li>
+                        <li>粘贴代码并部署</li>
+                        <li>获取 Worker URL 并填写到上面的输入框</li>
+                    </ol>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Cloudflare Worker 代码</label>
+                        <div class="position-relative">
+                            <textarea class="form-control font-monospace" rows="15" readonly onclick="this.select()" id="generatedCode">${code}</textarea>
+                            <button class="btn btn-sm btn-primary position-absolute top-0 end-0 m-2" onclick="copyGeneratedCode()">
+                                <i class="fas fa-copy"></i> 复制
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle"></i> 下一步</h6>
+                        <p class="mb-0">部署 Worker 后，将 Worker URL 填写到 "Cloudflare Worker URL" 输入框中。</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-primary" onclick="copyGeneratedCode()">
+                        <i class="fas fa-copy"></i> 复制代码
+                    </button>
+                    <a href="https://dash.cloudflare.com/" target="_blank" class="btn btn-success">
+                        <i class="fas fa-external-link-alt"></i> 打开 Cloudflare
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+// 复制生成的代码
+function copyGeneratedCode() {
+    const code = document.getElementById('generatedCode').value;
+    navigator.clipboard.writeText(code).then(() => {
+        showMessage('Worker 代码已复制到剪贴板', 'success');
+    }).catch(() => {
+        showMessage('复制失败', 'danger');
+    });
+}
+
+// 复制 Cloudflare Worker URL
+function copyCloudflareUrl() {
+    const workerUrl = document.getElementById('cloudflareWorkerUrl').value;
+    if (!workerUrl) {
+        showMessage('请先填写 Cloudflare Worker URL', 'warning');
+        return;
+    }
+    navigator.clipboard.writeText(workerUrl).then(() => {
+        showMessage('Cloudflare Worker URL已复制到剪贴板', 'success');
+    }).catch(() => {
+        showMessage('复制失败', 'danger');
+    });
+}
+
+// 显示 Cloudflare 配置指南
+function showCloudflareGuide() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fab fa-cloudflare text-warning"></i>
+                        Cloudflare Workers 配置指南
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> 为什么需要 Cloudflare Workers？</h6>
+                        <p class="mb-0">Telegram 只支持端口 80, 88, 443, 8443，而您的服务运行在 8090 端口。Cloudflare Workers 可以作为反向代理解决这个问题。</p>
+                    </div>
+
+                    <h6>📋 配置步骤</h6>
+                    <ol>
+                        <li><strong>填写服务器地址</strong><br>
+                            在上面的"目标服务器地址"中填写您的服务器地址
+                        </li>
+                        <li><strong>生成代码</strong><br>
+                            点击"生成代码"按钮，获取自定义的 Worker 代码
+                        </li>
+                        <li><strong>部署 Worker</strong><br>
+                            登录 <a href="https://dash.cloudflare.com/" target="_blank">Cloudflare Dashboard</a>，创建并部署 Worker
+                        </li>
+                        <li><strong>设置 Webhook</strong><br>
+                            将 Worker URL 填写到"Cloudflare Worker URL"输入框中
+                        </li>
+                    </ol>
+
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle"></i> 完成后</h6>
+                        <p class="mb-0">您就可以向 Bot 发送视频链接，系统会自动下载并推送文件到 Telegram！</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <a href="https://dash.cloudflare.com/" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt"></i> 打开 Cloudflare
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+
+    modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+    });
+}
+
+// 保存配置
+function saveTelegramConfig(event) {
+    event.preventDefault();
+
+    // 验证 API 配置
+    if (!validateApiConfig()) {
+        return;
+    }
+
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+
+    // 处理复选框
+    data.enabled = document.getElementById('enableTelegram').checked;
+    data.webhook_enabled = document.getElementById('enableWebhook').checked;
+    data.auto_download = document.getElementById('autoDownload').checked;
+
+    // 添加 Cloudflare Worker URL
+    data.webhook_url = document.getElementById('cloudflareWorkerUrl').value.trim();
+
+    fetch('/telegram/api/config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('配置保存成功', 'success');
+            updateConfigStatus();
+        } else {
+            showMessage('配置保存失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showMessage('保存失败: ' + error.message, 'danger');
+    });
+}
+
+// 加载配置
+function loadTelegramConfig() {
+    fetch('/telegram/api/config', {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const config = data.config;
+
+            // 填充表单
+            document.getElementById('botToken').value = config.bot_token || '';
+            document.getElementById('chatId').value = config.chat_id || '';
+            document.getElementById('apiId').value = config.api_id || '';
+            document.getElementById('apiHash').value = config.api_hash || '';
+            document.getElementById('enableTelegram').checked = config.enabled || false;
+            document.getElementById('enableWebhook').checked = config.webhook_enabled || false;
+            document.getElementById('autoDownload').checked = config.auto_download || false;
+            document.getElementById('pushMode').value = config.push_mode || 'file';
+            document.getElementById('fileSizeLimit').value = config.file_size_limit_mb || 50;
+            document.getElementById('cloudflareWorkerUrl').value = config.webhook_url || '';
+
+            updateConfigStatus();
+            updateApiConfigStatus(config);
+        }
+    })
+    .catch(error => {
+        console.error('加载配置失败:', error);
+    });
+}
+
+// 测试连接
+function testConnection() {
+    const btn = document.getElementById('testConnection');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中...';
+
+    const botToken = document.getElementById('botToken').value.trim();
+    const chatId = document.getElementById('chatId').value.trim();
+
+    if (!botToken || !chatId) {
+        showMessage('请先填写 Bot Token 和 Chat ID', 'warning');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-test-tube"></i> 测试连接';
+        return;
+    }
+
+    fetch('/telegram/api/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            bot_token: botToken,
+            chat_id: chatId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('连接测试成功！Bot 信息已验证，可以发送消息', 'success');
+        } else {
+            showMessage('连接测试失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showMessage('测试失败: ' + error.message, 'danger');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-test-tube"></i> 测试连接';
+    });
+}
+
+// 测试文件推送
+function testFilePush() {
+    const btn = document.getElementById('testFilePush');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中...';
+
+    const botToken = document.getElementById('botToken').value.trim();
+    const chatId = document.getElementById('chatId').value.trim();
+
+    if (!botToken || !chatId) {
+        showMessage('请先填写 Bot Token 和 Chat ID', 'warning');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-upload"></i> 测试文件推送';
+        return;
+    }
+
+    fetch('/telegram/api/test-file-push', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            bot_token: botToken,
+            chat_id: chatId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('文件推送测试成功！请检查您的 Telegram', 'success');
+        } else {
+            showMessage('文件推送测试失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showMessage('测试失败: ' + error.message, 'danger');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-upload"></i> 测试文件推送';
+    });
+}
+
+// 检查推送配置
+function checkPushConfig() {
+    const btn = document.getElementById('checkPushConfig');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 检查中...';
+
+    fetch('/telegram/api/check-push-config', {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const config = data.config;
+            let message = '📋 **推送配置检查结果**\n\n';
+
+            // Telegram 通知器状态
+            message += `🤖 **Telegram 通知器**\n`;
+            message += `- 启用状态: ${config.telegram_enabled ? '✅ 已启用' : '❌ 未启用'}\n`;
+            message += `- Bot Token: ${config.bot_token_configured ? '✅ 已配置' : '❌ 未配置'}\n`;
+            message += `- Chat ID: ${config.chat_id_configured ? '✅ 已配置' : '❌ 未配置'}\n\n`;
+
+            // Webhook 配置
+            message += `🔗 **Webhook 配置**\n`;
+            message += `- Webhook 启用: ${config.webhook_enabled ? '✅ 已启用' : '❌ 未启用'}\n`;
+            message += `- 自动下载: ${config.auto_download ? '✅ 已启用' : '❌ 未启用'}\n`;
+            message += `- 推送模式: ${config.push_mode}\n\n`;
+
+            // 问题诊断
+            message += `🔍 **问题诊断**\n`;
+            const issues = [];
+
+            if (!config.telegram_enabled) issues.push('- Telegram 通知未启用');
+            if (!config.bot_token_configured) issues.push('- Bot Token 未配置');
+            if (!config.chat_id_configured) issues.push('- Chat ID 未配置');
+            if (!config.webhook_enabled) issues.push('- Webhook 未启用');
+            if (!config.auto_download) issues.push('- 自动下载未启用');
+
+            // 检查 API ID/Hash 配置状态
+            const apiConfigured = config.api_id_configured && config.api_hash_configured;
+
+            if (issues.length === 0) {
+                if (apiConfigured) {
+                    message += '✅ 配置完整，支持所有文件大小的推送\n';
+                    message += '📋 功能说明：\n';
+                    message += '  • ≤50MB: 使用 Bot API（更稳定）\n';
+                    message += '  • 50MB-2GB: 使用 Pyrogram（支持大文件）';
+                } else {
+                    message += '⚠️ 基础配置正常，但有限制\n';
+                    message += '📋 当前状态：\n';
+                    message += '  • ≤50MB: ✅ 可以推送\n';
+                    message += '  • >50MB: ❌ 需要配置 API ID/Hash\n\n';
+                    message += '💡 建议配置 API ID 和 API Hash 以支持大文件推送';
+                }
+            } else {
+                message += '❌ 发现以下问题：\n' + issues.join('\n');
+                if (!apiConfigured) {
+                    message += '\n\n⚠️ 另外，未配置 API ID/Hash，无法推送大文件（>50MB）';
+                }
+            }
+
+            showMessage(message, 'info');
+        } else {
+            showMessage('检查失败: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        showMessage('检查失败: ' + error.message, 'danger');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search"></i> 检查推送配置';
+    });
+}
+
+// 设置 Webhook
+function setupWebhook() {
+    const btn = document.getElementById('setupWebhook');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 设置中...';
+
+    // 检查是否有 Cloudflare Worker URL
+    const cloudflareUrl = document.getElementById('cloudflareWorkerUrl').value.trim();
+
+    const requestData = {};
+    if (cloudflareUrl) {
+        requestData.webhook_url = cloudflareUrl;
+        console.log('使用 Cloudflare Worker URL:', cloudflareUrl);
+    }
+
+    fetch('/telegram/api/setup-webhook', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Webhook 设置成功！现在可以向 Bot 发送链接了', 'success');
+        } else {
+            if (data.port_issue) {
+                showMessage('端口问题：' + data.error + '。请使用 Cloudflare Workers 代理', 'warning');
+            } else {
+                showMessage('Webhook 设置失败: ' + data.error, 'danger');
+            }
+        }
+    })
+    .catch(error => {
+        showMessage('设置失败: ' + error.message, 'danger');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-link"></i> 设置Webhook';
+    });
+}
+
+// 更新配置状态
+function updateConfigStatus() {
+    const botToken = document.getElementById('botToken').value.trim();
+    const chatId = document.getElementById('chatId').value.trim();
+    const enabled = document.getElementById('enableTelegram').checked;
+    const webhookEnabled = document.getElementById('enableWebhook').checked;
+    const autoDownload = document.getElementById('autoDownload').checked;
+
+    const statusContainer = document.getElementById('configStatus');
+    let statusHtml = '';
+
+    if (botToken && chatId) {
+        statusHtml += '<div class="d-flex align-items-center mb-2"><i class="fas fa-check-circle text-success me-2"></i><span>Bot 配置完成</span></div>';
+    } else {
+        statusHtml += '<div class="d-flex align-items-center mb-2"><i class="fas fa-times-circle text-danger me-2"></i><span>Bot 配置未完成</span></div>';
+    }
+
+    if (enabled) {
+        statusHtml += '<div class="d-flex align-items-center mb-2"><i class="fas fa-check-circle text-success me-2"></i><span>Telegram 通知已启用</span></div>';
+    } else {
+        statusHtml += '<div class="d-flex align-items-center mb-2"><i class="fas fa-times-circle text-warning me-2"></i><span>Telegram 通知未启用</span></div>';
+    }
+
+    if (webhookEnabled && autoDownload) {
+        statusHtml += '<div class="d-flex align-items-center mb-2"><i class="fas fa-check-circle text-success me-2"></i><span>自动下载已启用</span></div>';
+    } else {
+        statusHtml += '<div class="d-flex align-items-center mb-2"><i class="fas fa-times-circle text-warning me-2"></i><span>自动下载未启用</span></div>';
+    }
+
+    statusContainer.innerHTML = statusHtml;
+}
+
+// 显示消息
+function showMessage(message, type) {
+    const container = document.getElementById('testResults');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    container.appendChild(alert);
+
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

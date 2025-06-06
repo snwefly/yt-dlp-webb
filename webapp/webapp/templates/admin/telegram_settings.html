@@ -1,0 +1,639 @@
+{% extends "base.html" %}
+
+{% block title %}Telegram推送设置{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fab fa-telegram"></i> Telegram推送设置</h2>
+                <div>
+                    <button id="testTelegram" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-test-tube"></i> 测试连接
+                    </button>
+                    <button id="testTelegramMessage" class="btn btn-outline-info me-2">
+                        <i class="fas fa-comment"></i> 测试消息
+                    </button>
+                    <button id="testTelegramFile" class="btn btn-outline-success me-2">
+                        <i class="fas fa-file-upload"></i> 测试文件推送
+                    </button>
+                    <button id="checkWebhookStatus" class="btn btn-outline-warning">
+                        <i class="fas fa-search"></i> 检查Webhook
+                    </button>
+                </div>
+            </div>
+
+            <!-- 状态卡片 -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-info-circle"></i> 配置状态
+                            </h5>
+                            <div id="telegramStatus">
+                                <div class="text-center">
+                                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                                    <span class="ms-2">检查中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-question-circle"></i> 如何配置
+                            </h5>
+                            <ol class="small">
+                                <li>与 <a href="https://t.me/BotFather" target="_blank">@BotFather</a> 对话创建Bot</li>
+                                <li>获取Bot Token</li>
+                                <li>获取Chat ID（个人或群组）</li>
+                                <li>在环境变量中配置</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Web配置表单 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-cog"></i> Telegram配置</h5>
+                </div>
+                <div class="card-body">
+                    <form id="telegramConfigForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="botToken" class="form-label">
+                                        <strong>Bot Token</strong>
+                                        <small class="text-muted">从 @BotFather 获取</small>
+                                    </label>
+                                    <input type="password" class="form-control" id="botToken" name="bot_token"
+                                           placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz">
+                                    <div class="form-text">
+                                        <a href="https://t.me/BotFather" target="_blank">
+                                            <i class="fas fa-external-link-alt"></i> 创建Bot
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="chatId" class="form-label">
+                                        <strong>Chat ID</strong>
+                                        <small class="text-muted">接收消息的聊天ID</small>
+                                    </label>
+                                    <input type="text" class="form-control" id="chatId" name="chat_id"
+                                           placeholder="123456789">
+                                    <div class="form-text">
+                                        <a href="https://t.me/userinfobot" target="_blank">
+                                            <i class="fas fa-external-link-alt"></i> 获取Chat ID
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="pushMode" class="form-label">推送模式</label>
+                                    <select class="form-select" id="pushMode" name="push_mode">
+                                        <option value="file">仅文件</option>
+                                        <option value="notification">仅通知</option>
+                                        <option value="both">文件+通知</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="fileSizeLimit" class="form-label">文件大小限制(MB)</label>
+                                    <input type="number" class="form-control" id="fileSizeLimit"
+                                           name="file_size_limit_mb" value="50" min="1" max="2048">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="webhookSecret" class="form-label">Webhook密钥</label>
+                                    <input type="password" class="form-control" id="webhookSecret"
+                                           name="webhook_secret" placeholder="可选的安全密钥">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enableTelegram" name="enabled">
+                                    <label class="form-check-label" for="enableTelegram">
+                                        启用Telegram通知
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enableWebhook" name="webhook_enabled">
+                                    <label class="form-check-label" for="enableWebhook">
+                                        启用Webhook自动下载
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="autoDownload" name="auto_download">
+                                    <label class="form-check-label" for="autoDownload">
+                                        自动下载链接
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 保存配置
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="loadConfig">
+                                <i class="fas fa-sync-alt"></i> 重新加载
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle"></i> 注意事项：</h6>
+                        <ul class="mb-0">
+                            <li>配置后需要重启容器才能生效</li>
+                            <li>Chat ID可以是个人ID或群组ID</li>
+                            <li>Bot需要有发送消息和文件的权限</li>
+                            <li>文件大小限制为50MB</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 推送模式说明 -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-paper-plane"></i> 推送模式说明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-file fa-2x text-success mb-2"></i>
+                                    <h6>文件模式</h6>
+                                    <small class="text-muted">直接发送下载的文件到Telegram</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-info">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-bell fa-2x text-info mb-2"></i>
+                                    <h6>通知模式</h6>
+                                    <small class="text-muted">仅发送下载完成通知</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-layer-group fa-2x text-warning mb-2"></i>
+                                    <h6>混合模式</h6>
+                                    <small class="text-muted">尝试发送文件，失败则发送通知</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 测试结果 -->
+            <div id="testResult" class="mt-3"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    checkTelegramStatus();
+    loadTelegramConfig();
+
+    // 测试连接按钮
+    document.getElementById('testTelegram').addEventListener('click', testTelegramConnection);
+
+    // 测试消息按钮
+    document.getElementById('testTelegramMessage').addEventListener('click', testTelegramMessage);
+
+    // 测试文件推送按钮
+    document.getElementById('testTelegramFile').addEventListener('click', testTelegramFile);
+
+    // 检查Webhook状态按钮
+    document.getElementById('checkWebhookStatus').addEventListener('click', checkWebhookStatus);
+
+    // 配置表单提交
+    document.getElementById('telegramConfigForm').addEventListener('submit', saveTelegramConfig);
+
+    // 重新加载配置
+    document.getElementById('loadConfig').addEventListener('click', loadTelegramConfig);
+});
+
+// 检查Telegram状态
+function checkTelegramStatus() {
+    fetch('/api/telegram/status', {
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayTelegramStatus(data);
+        } else {
+            showError('获取状态失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('获取状态失败: ' + error.message);
+    });
+}
+
+// 显示Telegram状态
+function displayTelegramStatus(status) {
+    const container = document.getElementById('telegramStatus');
+    
+    let html = '<div class="row">';
+    
+    // 总体状态
+    const overallStatus = status.enabled ? 'success' : 'danger';
+    const overallText = status.enabled ? '已启用' : '未配置';
+    const overallIcon = status.enabled ? 'check-circle' : 'times-circle';
+    
+    html += `
+        <div class="col-12 mb-2">
+            <span class="badge bg-${overallStatus}">
+                <i class="fas fa-${overallIcon}"></i> ${overallText}
+            </span>
+        </div>
+    `;
+    
+    // Bot Token状态
+    const tokenStatus = status.bot_token_configured ? 'success' : 'danger';
+    const tokenText = status.bot_token_configured ? '已配置' : '未配置';
+    const tokenIcon = status.bot_token_configured ? 'check' : 'times';
+    
+    html += `
+        <div class="col-6">
+            <small>Bot Token:</small><br>
+            <span class="badge bg-${tokenStatus}">
+                <i class="fas fa-${tokenIcon}"></i> ${tokenText}
+            </span>
+        </div>
+    `;
+    
+    // Chat ID状态
+    const chatStatus = status.chat_id_configured ? 'success' : 'danger';
+    const chatText = status.chat_id_configured ? '已配置' : '未配置';
+    const chatIcon = status.chat_id_configured ? 'check' : 'times';
+    
+    html += `
+        <div class="col-6">
+            <small>Chat ID:</small><br>
+            <span class="badge bg-${chatStatus}">
+                <i class="fas fa-${chatIcon}"></i> ${chatText}
+            </span>
+        </div>
+    `;
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// 测试Telegram连接
+function testTelegramConnection() {
+    const btn = document.getElementById('testTelegram');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 测试中...';
+
+    fetch('/api/telegram/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess('✅ Telegram连接测试成功！' + (data.message ? ' ' + data.message : ''));
+            if (data.bot_info) {
+                showInfo(`🤖 Bot信息: ${data.bot_info.first_name} (@${data.bot_info.username})`);
+            }
+        } else {
+            showError('❌ Telegram连接测试失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('❌ 测试失败: ' + error.message);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-test-tube"></i> 测试连接';
+    });
+}
+
+// 测试Telegram消息发送
+function testTelegramMessage() {
+    const btn = document.getElementById('testTelegramMessage');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 发送测试消息...';
+
+    // 获取当前配置
+    const botToken = document.getElementById('botToken').value;
+    const chatId = document.getElementById('chatId').value;
+
+    if (!botToken || !chatId) {
+        showError('❌ 请先配置 Bot Token 和 Chat ID');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-comment"></i> 测试消息';
+        return;
+    }
+
+    fetch('/telegram/api/test-message', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            bot_token: botToken,
+            chat_id: chatId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess('✅ ' + data.message);
+            showInfo('📱 请检查你的Telegram是否收到了测试消息！');
+        } else {
+            showError('❌ 消息发送测试失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('❌ 测试失败: ' + error.message);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-comment"></i> 测试消息';
+    });
+}
+
+// 测试Telegram文件推送
+function testTelegramFile() {
+    const btn = document.getElementById('testTelegramFile');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 发送测试文件...';
+
+    // 使用临时文件路径
+    const testFilePath = './telegram_test_file.txt';
+
+    fetch('/api/telegram/test-file', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            file_path: testFilePath
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess('✅ ' + data.message);
+            showInfo('📱 请检查你的Telegram是否收到了测试文件！');
+        } else {
+            showError('❌ 文件推送测试失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('❌ 测试失败: ' + error.message);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-upload"></i> 测试文件推送';
+    });
+}
+
+// 检查Webhook状态
+function checkWebhookStatus() {
+    const btn = document.getElementById('checkWebhookStatus');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 检查中...';
+
+    fetch('/telegram/api/webhook-status', {
+        method: 'GET',
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayWebhookStatus(data);
+        } else {
+            showError('❌ 检查Webhook状态失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('❌ 检查失败: ' + error.message);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search"></i> 检查Webhook';
+    });
+}
+
+// 显示Webhook状态
+function displayWebhookStatus(data) {
+    const webhook_info = data.webhook_info;
+    const config_status = data.config_status;
+    const issues = data.issues;
+    const recommendations = data.recommendations;
+
+    let statusHtml = '<div class="alert alert-info"><h6><i class="fas fa-info-circle"></i> Webhook 状态检查结果</h6>';
+
+    // Webhook URL状态
+    if (webhook_info.webhook_url) {
+        statusHtml += `<p><strong>✅ Webhook URL:</strong> ${webhook_info.webhook_url}</p>`;
+    } else {
+        statusHtml += `<p><strong>❌ Webhook URL:</strong> 未设置</p>`;
+    }
+
+    // 配置状态
+    statusHtml += `<p><strong>配置状态:</strong></p><ul>`;
+    statusHtml += `<li>Webhook启用: ${config_status.webhook_enabled ? '✅ 是' : '❌ 否'}</li>`;
+    statusHtml += `<li>自动下载: ${config_status.auto_download ? '✅ 是' : '❌ 否'}</li>`;
+    statusHtml += `<li>推送模式: ${config_status.push_mode}</li>`;
+    statusHtml += `<li>Chat ID: ${config_status.chat_id}</li>`;
+    statusHtml += `</ul>`;
+
+    // 待处理更新
+    if (webhook_info.pending_update_count > 0) {
+        statusHtml += `<p><strong>⚠️ 待处理更新:</strong> ${webhook_info.pending_update_count} 个</p>`;
+    }
+
+    // 最近错误
+    if (webhook_info.last_error_message) {
+        statusHtml += `<p><strong>❌ 最近错误:</strong> ${webhook_info.last_error_message}</p>`;
+        if (webhook_info.last_error_date) {
+            const errorDate = new Date(webhook_info.last_error_date * 1000);
+            statusHtml += `<p><strong>错误时间:</strong> ${errorDate.toLocaleString()}</p>`;
+        }
+    }
+
+    statusHtml += '</div>';
+
+    // 问题列表
+    if (issues.length > 0) {
+        statusHtml += '<div class="alert alert-warning"><h6><i class="fas fa-exclamation-triangle"></i> 发现的问题</h6><ul>';
+        issues.forEach(issue => {
+            statusHtml += `<li>${issue}</li>`;
+        });
+        statusHtml += '</ul></div>';
+    }
+
+    // 建议
+    if (recommendations.length > 0) {
+        statusHtml += '<div class="alert alert-success"><h6><i class="fas fa-lightbulb"></i> 建议</h6><ul>';
+        recommendations.forEach(rec => {
+            statusHtml += `<li>${rec}</li>`;
+        });
+        statusHtml += '</ul></div>';
+    }
+
+    // 显示结果
+    const container = document.getElementById('testResult');
+    container.innerHTML = statusHtml;
+}
+
+// 加载Telegram配置
+function loadTelegramConfig() {
+    fetch('/telegram/api/config', {
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            fillConfigForm(data.config);
+        } else {
+            showError('加载配置失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('加载配置失败: ' + error.message);
+    });
+}
+
+// 填充配置表单
+function fillConfigForm(config) {
+    document.getElementById('botToken').value = config.bot_token || '';
+    document.getElementById('chatId').value = config.chat_id || '';
+    document.getElementById('pushMode').value = config.push_mode || 'file';
+    document.getElementById('fileSizeLimit').value = config.file_size_limit_mb || 50;
+    document.getElementById('webhookSecret').value = config.webhook_secret || '';
+    document.getElementById('enableTelegram').checked = config.enabled || false;
+    document.getElementById('enableWebhook').checked = config.webhook_enabled || false;
+    document.getElementById('autoDownload').checked = config.auto_download || false;
+}
+
+// 保存Telegram配置
+function saveTelegramConfig(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    const config = {};
+
+    // 收集表单数据
+    for (let [key, value] of formData.entries()) {
+        if (key === 'enabled' || key === 'webhook_enabled' || key === 'auto_download') {
+            config[key] = true; // checkbox选中时才会出现在formData中
+        } else {
+            config[key] = value;
+        }
+    }
+
+    // 处理未选中的checkbox
+    if (!formData.has('enabled')) config.enabled = false;
+    if (!formData.has('webhook_enabled')) config.webhook_enabled = false;
+    if (!formData.has('auto_download')) config.auto_download = false;
+
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+
+    fetch('/telegram/api/config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess('✅ 配置保存成功！');
+            // 重新检查状态
+            checkTelegramStatus();
+        } else {
+            showError('❌ 保存失败: ' + data.error);
+        }
+    })
+    .catch(error => {
+        showError('❌ 保存失败: ' + error.message);
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> 保存配置';
+    });
+}
+
+// 显示消息函数
+function showSuccess(message) {
+    showMessage(message, 'success');
+}
+
+function showError(message) {
+    showMessage(message, 'danger');
+}
+
+function showInfo(message) {
+    showMessage(message, 'info');
+}
+
+function showMessage(message, type) {
+    const container = document.getElementById('testResult');
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    container.innerHTML = alertHtml;
+
+    // 5秒后自动消失
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}
