@@ -69,224 +69,52 @@ def _test_directory_write(test_file, directory):
         logger.warning(f"⚠️ 目录权限测试失败: {e}")
         return False
 
-def create_app():
-    """创建Flask应用"""
-    app = Flask(__name__)
+def create_app(config=None):
+    """创建Flask应用
 
-    # 配置日志 - 确保输出到容器日志
-    if not app.debug:
-        import logging
-        from logging.config import dictConfig
+    Args:
+        config: 可选的配置字典，用于覆盖默认配置
+    """
+    # 使用统一的应用初始化器
+    from .core.app_initializer import create_and_initialize_app
+    return create_and_initialize_app(config)
 
-        dictConfig({
-            'version': 1,
-            'formatters': {
-                'default': {
-                    'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
-                }
-            },
-            'handlers': {
-                'wsgi': {
-                    'class': 'logging.StreamHandler',
-                    'stream': 'ext://flask.logging.wsgi_errors_stream',
-                    'formatter': 'default'
-                }
-            },
-            'root': {
-                'level': 'INFO',
-                'handlers': ['wsgi']
-            }
-        })
-
-        app.logger.info('🚀 Flask 应用已启动，日志系统已配置')
-
-    # 配置应用
-    app.config.update(
-        SECRET_KEY=os.environ.get('SECRET_KEY', 'your-secret-key-change-this'),
-        DOWNLOAD_FOLDER=os.environ.get('DOWNLOAD_FOLDER', '/app/downloads'),
-        MAX_CONTENT_LENGTH=16 * 1024 * 1024 * 1024,  # 16GB
-        # 增加session超时时间到30天，与AuthManager保持一致
-        PERMANENT_SESSION_LIFETIME=timedelta(days=int(os.environ.get('SESSION_TIMEOUT_DAYS', '30')))
-    )
-
-    # 设置日志
-    if not app.debug:
-        logging.basicConfig(level=logging.INFO)
-
-    # 在应用上下文中初始化所有组件
-    with app.app_context():
-        # 初始化数据库
-        _init_database(app)
-
-        # 初始化Flask-Login
-        _init_login_manager(app)
-
-        # 初始化其他组件
-        _initialize_app(app)
-
-    # 注册蓝图
-    _register_blueprints(app)
-
-    return app
-
+# 这些函数已经移动到 app_initializer.py 中，保留用于向后兼容
 def _init_database(app):
-    """初始化数据库"""
-    try:
-        from .models import db
+    """初始化数据库（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _init_database 已废弃，请使用 app_initializer")
+    pass
 
-        # 配置数据库 - 使用绝对路径
-        db_path = os.path.join(os.getcwd(), 'app.db')
-        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        logger.info(f"数据库路径: {db_path}")
-
-        # 初始化数据库
-        db.init_app(app)
-
-        # 创建表（已经在应用上下文中）
-        db.create_all()
-
-        # 创建默认管理员用户
-        from .models import User, TelegramConfig
-        admin_user = User.query.filter_by(username='admin').first()
-        if not admin_user:
-            admin_user = User(
-                username='admin',
-                email='admin@example.com',
-                is_admin=True
-            )
-            admin_user.set_password('admin123')
-            db.session.add(admin_user)
-            db.session.commit()
-            logger.info("✅ 默认管理员用户已创建: admin/admin123")
-        else:
-            logger.info("✅ 管理员用户已存在")
-
-        # 确保Telegram配置存在
-        telegram_config = TelegramConfig.query.first()
-        if not telegram_config:
-            telegram_config = TelegramConfig()
-            db.session.add(telegram_config)
-            db.session.commit()
-            logger.info("✅ 默认Telegram配置已创建")
-        else:
-            logger.info("✅ Telegram配置已存在")
-
-        logger.info("✅ 数据库初始化成功")
-
-    except Exception as e:
-        logger.error(f"数据库初始化失败: {e}")
-        import traceback
-        logger.error(f"详细错误: {traceback.format_exc()}")
-
+# 这些函数已经移动到 app_initializer.py 中，保留用于向后兼容
 def _init_login_manager(app):
-    """初始化Flask-Login"""
-    try:
-        login_manager = LoginManager()
-        login_manager.init_app(app)
-        login_manager.login_view = 'auth.login'
-        login_manager.login_message = '请先登录以访问此页面。'
-        login_manager.login_message_category = 'info'
-
-        @login_manager.user_loader
-        def load_user(user_id):
-            from .models import User
-            return User.query.get(int(user_id))
-
-        logger.info("✅ Flask-Login初始化成功")
-
-    except Exception as e:
-        logger.error(f"Flask-Login初始化失败: {e}")
+    """初始化Flask-Login（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _init_login_manager 已废弃，请使用 app_initializer")
+    pass
 
 def _initialize_app(app):
-    """初始化应用组件"""
-    try:
-        # 初始化目录
-        _init_directories(app)
-
-        # 初始化 yt-dlp
-        from .core.ytdlp_manager import initialize_ytdlp
-        if initialize_ytdlp():
-            logger.info("✅ yt-dlp 初始化成功")
-        else:
-            logger.warning("⚠️ yt-dlp 初始化失败，但应用将继续运行")
-
-        # 初始化文件清理管理器
-        _init_cleanup_manager(app)
-
-        # 初始化下载管理器
-        from .core.download_manager import initialize_download_manager
-        initialize_download_manager(app)
-        logger.info("✅ 下载管理器初始化成功")
-
-        # 自动数据库迁移
-        _auto_migrate_database(app)
-
-    except Exception as e:
-        logger.error(f"应用初始化失败: {e}")
+    """初始化应用组件（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _initialize_app 已废弃，请使用 app_initializer")
+    pass
 
 def _init_directories(app):
-    """初始化目录（以 root 用户运行，简化处理）"""
-    try:
-        download_folder = app.config['DOWNLOAD_FOLDER']
-        os.makedirs(download_folder, exist_ok=True)
-        logger.info(f"下载目录已创建: {download_folder}")
-
-        # 设置权限
-        _fix_directory_permissions(download_folder)
-
-        # 权限测试
-        test_file = os.path.join(download_folder, '.write_test')
-        if _test_directory_write(test_file, download_folder):
-            logger.info(f"✅ 下载目录权限验证成功: {download_folder}")
-        else:
-            logger.warning(f"⚠️ 下载目录权限测试失败，但继续运行: {download_folder}")
-
-    except Exception as e:
-        logger.error(f"目录初始化失败: {e}")
-        # 使用系统临时目录作为备用
-        import tempfile
-        temp_dir = tempfile.mkdtemp(prefix='ytdlp_fallback_')
-        app.config['DOWNLOAD_FOLDER'] = temp_dir
-        logger.info(f"🆘 使用系统临时目录: {temp_dir}")
+    """初始化目录（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _init_directories 已废弃，请使用 app_initializer")
+    pass
 
 def _init_cleanup_manager(app):
-    """初始化文件清理管理器"""
-    try:
-        from .file_cleaner import initialize_cleanup_manager
-
-        cleanup_config = {
-            'auto_cleanup_enabled': True,
-            'cleanup_interval_hours': 1,
-            'file_retention_hours': 24,
-            'max_storage_mb': 2048,
-            'cleanup_on_download': True,
-            'keep_recent_files': 20,
-            'temp_file_retention_minutes': 30,
-        }
-
-        initialize_cleanup_manager(app.config['DOWNLOAD_FOLDER'], cleanup_config)
-        logger.info("✅ 文件清理管理器初始化成功")
-
-    except Exception as e:
-        logger.error(f"文件清理管理器初始化失败: {e}")
+    """初始化文件清理管理器（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _init_cleanup_manager 已废弃，请使用 app_initializer")
+    pass
 
 def _register_blueprints(app):
-    """注册蓝图"""
-    try:
-        from .routes import main_bp, auth_bp, api_bp, admin_bp, shortcuts_bp, telegram_bp
+    """注册蓝图（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _register_blueprints 已废弃，请使用 app_initializer")
+    pass
 
-        app.register_blueprint(main_bp)
-        app.register_blueprint(auth_bp)
-        app.register_blueprint(api_bp, url_prefix='/api')
-        app.register_blueprint(admin_bp, url_prefix='/admin')
-        app.register_blueprint(shortcuts_bp, url_prefix='/api/shortcuts')
-        app.register_blueprint(telegram_bp, url_prefix='/telegram')
-
-        logger.info("✅ 蓝图注册成功")
-
-    except Exception as e:
-        logger.error(f"蓝图注册失败: {e}")
+def _register_error_handlers(app):
+    """注册错误处理器（已废弃，使用 app_initializer）"""
+    logger.warning("⚠️ _register_error_handlers 已废弃，请使用 app_initializer")
+    pass
 
 def _auto_migrate_database(app):
     """自动数据库迁移 - 添加缺失的字段"""
@@ -332,15 +160,28 @@ def _auto_migrate_database(app):
                 with db.engine.connect() as conn:
                     from sqlalchemy import text
 
-                    # 添加 api_id 字段
+                    # 添加 api_id 字段（整数类型）
                     if 'api_id' not in columns:
                         if db.engine.name == 'sqlite':
-                            conn.execute(text("ALTER TABLE telegram_config ADD COLUMN api_id VARCHAR(20)"))
+                            conn.execute(text("ALTER TABLE telegram_config ADD COLUMN api_id INTEGER"))
                         else:
-                            conn.execute(text("ALTER TABLE telegram_config ADD COLUMN api_id VARCHAR(20) NULL"))
-                        logger.info("✅ 添加 api_id 字段成功")
+                            conn.execute(text("ALTER TABLE telegram_config ADD COLUMN api_id INTEGER NULL"))
+                        logger.info("✅ 添加 api_id 字段成功（整数类型）")
                     else:
-                        logger.info("ℹ️ api_id 字段已存在")
+                        # 检查现有字段类型，如果是字符串类型则需要迁移
+                        logger.info("ℹ️ api_id 字段已存在，检查类型...")
+                        try:
+                            # 尝试获取字段类型信息
+                            if db.engine.name == 'sqlite':
+                                type_result = conn.execute(text("PRAGMA table_info(telegram_config)"))
+                                for row in type_result.fetchall():
+                                    if row[1] == 'api_id' and 'VARCHAR' in str(row[2]).upper():
+                                        logger.warning("⚠️ 检测到 api_id 字段为字符串类型，需要数据迁移")
+                                        # 对于 SQLite，我们需要重建表来改变字段类型
+                                        # 这里先记录警告，实际迁移可以在后续版本中处理
+                                        logger.warning("📝 建议：请手动检查 api_id 字段中的数据是否为有效整数")
+                        except Exception as type_check_error:
+                            logger.debug(f"字段类型检查失败: {type_check_error}")
 
                     # 添加 api_hash 字段
                     if 'api_hash' not in columns:
@@ -368,6 +209,11 @@ def _auto_migrate_database(app):
 # 为 gunicorn 提供应用工厂函数
 def get_app():
     """获取应用实例（用于 gunicorn）"""
+    return create_app()
+
+# WSGI 应用工厂（用于 gunicorn）
+def application():
+    """WSGI 应用工厂函数"""
     return create_app()
 
 # 为了兼容性，提供 app 变量

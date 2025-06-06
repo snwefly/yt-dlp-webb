@@ -50,9 +50,10 @@ class DownloadManager:
 
         logger.info(f"📥 创建下载任务: {download_id} - {url}")
 
-        # 发送Telegram开始通知
+        # 发送Telegram开始通知（使用服务注册中心）
+        from .service_registry import get_telegram_notifier
         telegram_notifier = get_telegram_notifier()
-        if telegram_notifier.is_enabled():
+        if telegram_notifier and telegram_notifier.is_enabled():
             telegram_notifier.send_download_started(url, download_id)
 
         # 立即启动下载任务
@@ -82,6 +83,22 @@ class DownloadManager:
                 self.downloads[download_id].update(kwargs)
                 return True
         return False
+
+    def _execute_with_app_context(self, func, *args, **kwargs):
+        """统一的应用上下文执行方法，避免嵌套上下文问题"""
+        if self.app:
+            # 检查是否已经在应用上下文中
+            from flask import has_app_context
+            if has_app_context():
+                # 已经在应用上下文中，直接执行
+                return func(*args, **kwargs)
+            else:
+                # 创建新的应用上下文
+                with self.app.app_context():
+                    return func(*args, **kwargs)
+        else:
+            # 没有应用实例，直接执行
+            return func(*args, **kwargs)
 
     def _execute_download(self, download_id, url, options):
         """执行实际的下载任务"""
@@ -146,13 +163,8 @@ class DownloadManager:
                 logger.error(f"🚀🚀🚀 准备调用 Telegram 推送函数 🚀🚀🚀")
 
                 try:
-                    # 🔧 在应用上下文中执行推送
-                    if self.app:
-                        with self.app.app_context():
-                            self._send_telegram_notification(download_id)
-                    else:
-                        # 如果没有应用实例，直接调用
-                        self._send_telegram_notification(download_id)
+                    # 🔧 统一的应用上下文管理
+                    self._execute_with_app_context(self._send_telegram_notification, download_id)
                     print("✅✅✅ Telegram 推送函数调用完成 ✅✅✅")
                     logger.error(f"✅✅✅ Telegram 推送函数调用完成 ✅✅✅")
                 except Exception as e:
@@ -161,11 +173,12 @@ class DownloadManager:
 
                     # 尝试发送错误通知
                     try:
-                        if self.app:
-                            with self.app.app_context():
-                                from ..core.telegram_notifier import TelegramNotifier
-                                notifier = TelegramNotifier()
-                                notifier.send_message(f"❌ **推送失败**\n\n文件: {main_file}\n错误: {str(e)}")
+                        def send_error_notification():
+                            from ..core.telegram_notifier import TelegramNotifier
+                            notifier = TelegramNotifier()
+                            notifier.send_message(f"❌ **推送失败**\n\n文件: {main_file}\n错误: {str(e)}")
+
+                        self._execute_with_app_context(send_error_notification)
                     except:
                         pass
             else:

@@ -40,7 +40,7 @@ class TelegramConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bot_token = db.Column(db.String(255), nullable=True)
     chat_id = db.Column(db.String(100), nullable=True)
-    api_id = db.Column(db.String(20), nullable=True)  # Telegram API ID
+    api_id = db.Column(db.Integer, nullable=True)  # Telegram API ID (数字类型)
     api_hash = db.Column(db.String(50), nullable=True)  # Telegram API Hash
     webhook_enabled = db.Column(db.Boolean, default=False)
     webhook_secret = db.Column(db.String(255), nullable=True)

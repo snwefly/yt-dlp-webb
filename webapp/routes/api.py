@@ -317,7 +317,7 @@ def download_file_by_name(filename):
 def list_files():
     """列出所有已下载的文件"""
     try:
-        download_manager = get_download_manager()
+        download_manager = get_download_manager(current_app)
         files = download_manager.list_downloaded_files()
 
         # 格式化文件大小
