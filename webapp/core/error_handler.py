@@ -178,11 +178,25 @@ def success_response(data: Any = None, message: str = "操作成功") -> Dict[st
         'success': True,
         'message': message
     }
-    
+
     if data is not None:
         response['data'] = data
-    
+
     return response
+
+def error_response(message: str, status_code: int = 400, details: Optional[Dict] = None) -> tuple:
+    """创建错误响应（返回 JSON 响应和状态码的元组）"""
+    from flask import jsonify
+
+    response_data = {
+        'success': False,
+        'error': message
+    }
+
+    if details:
+        response_data.update(details)
+
+    return jsonify(response_data), status_code
 
 def paginated_response(items: list, total: int, page: int, per_page: int, 
                       message: str = "获取成功") -> Dict[str, Any]:

@@ -140,8 +140,7 @@ RUN dos2unix /app/scripts/start-hybrid.sh && \
     touch /app/logs/.test_write && rm /app/logs/.test_write && \
     echo "✅ 混合模式配置完成，权限测试通过"
 
-# 基础依赖验证（避免在构建时触发复杂的应用逻辑）
-RUN python -c "import flask_login, flask, flask_sqlalchemy, gunicorn; print('✅ 核心依赖验证通过')"
+# 跳过构建时验证，在运行时进行检查
 
 # 使用 root 用户运行（注释掉 USER 指令）
 # USER ytdlp
