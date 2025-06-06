@@ -370,11 +370,11 @@ def get_app():
     """获取应用实例（用于 gunicorn）"""
     return create_app()
 
-# 为了兼容性，提供 app 变量（仅在直接运行时使用）
+# 为了兼容性，提供 app 变量
 if __name__ == '__main__':
     app = create_app()
     app.run(host='0.0.0.0', port=8080, debug=False)
 else:
-    # 为 gunicorn 提供应用实例
-    # gunicorn 期望找到一个名为 'app' 的应用对象
-    app = create_app()
+    # 不在模块级别创建应用实例，避免应用上下文问题
+    # gunicorn 将使用工厂函数模式
+    app = None

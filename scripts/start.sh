@@ -290,7 +290,7 @@ except Exception as e:
 # 使用 gunicorn 启动（生产环境）
 if command -v gunicorn &> /dev/null; then
     echo "使用 Gunicorn 启动..."
-    exec gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 --access-logfile - --error-logfile - webapp.app:app
+    exec gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 --access-logfile - --error-logfile - "webapp.app:create_app"
 else
     echo "使用 Flask 开发服务器启动..."
     exec python3 -c "
